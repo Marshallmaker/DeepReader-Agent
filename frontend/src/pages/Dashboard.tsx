@@ -232,6 +232,7 @@ function Dashboard() {
         onClose={() => setShowMetricSettings(false)}
         onAddMetric={() => setShowAddMetric(true)}
         onDeleteMetric={handleDeleteMetric}
+        onRefresh={loadMetrics}
       />
 
       <AddMetricModal

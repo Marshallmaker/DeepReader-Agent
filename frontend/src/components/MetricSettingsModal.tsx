@@ -1,7 +1,8 @@
-import { Modal, Button, Checkbox, Tag, message } from 'antd'
+import { Modal, Button, Checkbox, Tag, message, Space } from 'antd'
 import { SettingOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import { MetricDefinition } from '../services/metricService'
 import { extractErrorMessage } from '../utils/errorHandler'
+import TemplateSelector from './TemplateSelector'
 
 interface MetricSettingsModalProps {
   open: boolean
@@ -11,11 +12,13 @@ interface MetricSettingsModalProps {
   onClose: () => void
   onAddMetric: () => void
   onDeleteMetric: (id: number) => Promise<void>
+  /** 模板导入完成后触发，用于刷新父组件中的指标列表 */
+  onRefresh: () => void
 }
 
 function MetricSettingsModal({
   open, metrics, selectedIds, onSelectionChange,
-  onClose, onAddMetric, onDeleteMetric,
+  onClose, onAddMetric, onDeleteMetric, onRefresh,
 }: MetricSettingsModalProps) {
   const handleSelectAll = (checked: boolean) => {
     onSelectionChange(checked ? metrics.map(m => m.id) : [])
@@ -51,7 +54,10 @@ function MetricSettingsModal({
           >
             全选 ({metrics.length}个)
           </Checkbox>
-          <Button icon={<PlusOutlined />} onClick={onAddMetric} className="add-metric-btn">添加指标</Button>
+          <Space>
+            <TemplateSelector onImportComplete={onRefresh} />
+            <Button icon={<PlusOutlined />} onClick={onAddMetric} className="add-metric-btn">添加指标</Button>
+          </Space>
         </div>
 
         <div className="metric-list">
