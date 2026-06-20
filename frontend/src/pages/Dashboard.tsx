@@ -9,6 +9,7 @@ import ComparisonModal from '../components/ComparisonModal'
 import MetricSettingsModal from '../components/MetricSettingsModal'
 import AddMetricModal from '../components/AddMetricModal'
 import ChartModal from '../components/ChartModal'
+import AutoChartGrid from '../components/AutoChartGrid'
 import '../styles/components.css'
 import './Dashboard.css'
 
@@ -224,6 +225,10 @@ function Dashboard() {
         metricDefinitions={metricDefinitions}
         onClose={() => setShowComparison(false)}
       />
+
+      {selectedBatch && (
+        <AutoChartGrid batchId={selectedBatch} />
+      )}
 
       <MetricSettingsModal
         open={showMetricSettings}
