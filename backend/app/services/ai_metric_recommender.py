@@ -1,0 +1,125 @@
+# backend/app/services/ai_metric_recommender.py
+"""
+AI 指标推荐服务 — 分析 PDF 样本，推荐指标体系 + 自动生成提示词。
+"""
+import json
+import logging
+from typing import Optional, Dict, Any
+from openai import OpenAI
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+RECOMMEND_SYSTEM_PROMPT = """你是一个金融分析专家。请分析以下研究报告，完成两个任务：
+
+1. 判断这份报告的类型（如：港股回购报告、A股年报、美股10-K、宏观研报等）
+2. 列出该报告中**所有可以提取的关键指标**，并为每个指标：
+   - 生成一个英文 metric_key（snake_case）
+   - 给出中文 metric_label
+   - 判断 expected_type（NUMERIC 数值型 或 TEXT 文本型）
+   - 编写一句简洁的 prompt_instruction，指导 AI 如何从报告中精准提取该指标
+
+返回严格 JSON 格式：
+{
+  "report_type": "报告类型",
+  "recommended_metrics": [
+    {
+      "metric_key": "net_profit",
+      "metric_label": "归母净利润",
+      "expected_type": "NUMERIC",
+      "prompt_instruction": "从合并利润表中提取归属于母公司股东的净利润，剔除一次性项目，单位为亿元"
+    }
+  ]
+}
+
+要求：
+- 指标数量不少于 5 个，不多于 20 个
+- 优先提取核心财务指标（营收、利润、资产、现金流等）
+- 其次提取行业特有指标
+- prompt_instruction 要具体，包含数据来源（如"合并资产负债表"）和清洗规则
+- metric_key 全小写，用下划线分隔，如 total_assets、eps_diluted
+"""
+
+
+def recommend_metrics_from_report(
+    report_markdown: str,
+    report_type_hint: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    分析 PDF 报告内容，推荐可提取的指标体系。
+
+    Args:
+        report_markdown: PDF 转换后的 Markdown 文本（前 20 页）
+        report_type_hint: 用户提供的报告类型提示（可选）
+
+    Returns:
+        {"report_type": str, "recommended_metrics": [{...}]}
+    """
+    settings = get_settings()
+    client = OpenAI(
+        api_key=settings.SILICONFLOW_API_KEY,
+        base_url=settings.SILICONFLOW_API_BASE,
+    )
+
+    # 截断文本（最多 8000 字符，减少 token 消耗）
+    truncated = report_markdown[:8000]
+
+    user_prompt = f"请分析以下研究报告内容：\n\n{truncated}"
+    if report_type_hint:
+        user_prompt = f"这份报告的类型可能是：{report_type_hint}\n\n{user_prompt}"
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.SILICONFLOW_MODEL,
+            messages=[
+                {"role": "system", "content": RECOMMEND_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.1,
+            max_tokens=2000,
+            response_format={"type": "json_object"},
+        )
+        content = response.choices[0].message.content
+        result = json.loads(content)
+        # 验证返回格式
+        if "recommended_metrics" not in result:
+            result["recommended_metrics"] = []
+        for m in result["recommended_metrics"]:
+            m.setdefault("expected_type", "NUMERIC")
+            m.setdefault("prompt_instruction", "")
+        return result
+    except Exception as e:
+        logger.error(f"AI 指标推荐失败: {e}")
+        raise
+
+
+def recommend_metrics_from_text(
+    text: str,
+    report_type_hint: Optional[str] = None,
+) -> Dict[str, Any]:
+    """无 PDF 时，根据文字描述推荐指标"""
+    settings = get_settings()
+    client = OpenAI(
+        api_key=settings.SILICONFLOW_API_KEY,
+        base_url=settings.SILICONFLOW_API_BASE,
+    )
+
+    user_prompt = f"请为以下类型的报告推荐指标体系：{text}"
+    if report_type_hint:
+        user_prompt = f"报告类型：{report_type_hint}。{user_prompt}"
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.SILICONFLOW_MODEL,
+            messages=[
+                {"role": "system", "content": RECOMMEND_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+            max_tokens=2000,
+            response_format={"type": "json_object"},
+        )
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"AI 指标推荐失败（文本模式）: {e}")
+        raise

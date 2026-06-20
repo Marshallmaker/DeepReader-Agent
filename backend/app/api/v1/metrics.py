@@ -5,11 +5,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel, Field
 from app.database import get_db
 from app.api.dependencies import get_current_user
 from app.models.user import User
 from app.models.metric_definition import MetricDefinition, ExpectedType
+from app.models.batch import UploadBatch
+from app.models.report import Report
+from app.services.ai_metric_recommender import recommend_metrics_from_report, recommend_metrics_from_text
 from app.schemas.metric import (
     MetricDefinitionCreate,
     MetricUpdate,
@@ -271,4 +275,73 @@ async def update_metric_definition(
             "prompt_instruction": metric.prompt_instruction,
             "is_system": metric.is_system
         }
+    )
+
+
+# ── AI 指标推荐 ──────────────────────────────────────────────
+
+class AIRecommendRequest(BaseModel):
+    """AI 指标推荐请求"""
+    batch_id: Optional[int] = Field(None, description="已有批次的 ID，AI 将分析该批次中的第一份 PDF")
+    report_type_hint: Optional[str] = Field(None, max_length=200, description="用户提供的报告类型提示")
+
+
+class RecommendedMetricItem(BaseModel):
+    """推荐的单条指标"""
+    metric_key: str
+    metric_label: str
+    expected_type: str
+    prompt_instruction: Optional[str] = ""
+
+
+class AIRecommendResponse(BaseModel):
+    """AI 指标推荐响应"""
+    status: str = "success"
+    report_type: str
+    recommended_metrics: List[RecommendedMetricItem]
+
+
+@router.post("/ai-recommend", response_model=AIRecommendResponse)
+def ai_recommend_metrics(
+    body: AIRecommendRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """AI 智能推荐指标 + 自动生成提示词"""
+    if body.batch_id:
+        # 从批次中获取第一份已完成 PDF 的 Markdown 内容
+        report = db.query(Report).join(
+            UploadBatch, Report.batch_id == UploadBatch.id
+        ).filter(
+            Report.batch_id == body.batch_id,
+            UploadBatch.user_id == current_user.id,
+            Report.raw_markdown.isnot(None),
+            Report.raw_markdown != "",
+        ).first()
+
+        if not report:
+            raise HTTPException(
+                status_code=404,
+                detail="未找到可用的 PDF 解析内容，请确保批次中有已完成处理的报告"
+            )
+
+        result = recommend_metrics_from_report(
+            report.raw_markdown,
+            report_type_hint=body.report_type_hint,
+        )
+    elif body.report_type_hint:
+        # 纯文本模式：用户描述报告类型
+        result = recommend_metrics_from_text(
+            body.report_type_hint,
+            report_type_hint=body.report_type_hint,
+        )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="请提供 batch_id 或 report_type_hint"
+        )
+
+    return AIRecommendResponse(
+        report_type=result.get("report_type", "未知"),
+        recommended_metrics=result.get("recommended_metrics", []),
     )
