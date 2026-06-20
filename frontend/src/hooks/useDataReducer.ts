@@ -43,19 +43,21 @@ function applyTopN(data: SeriesData[], n: number): SeriesData[] {
 
 function aggregateByGranularity(data: SeriesData[], granularity: 'day' | 'month' | 'quarter'): SeriesData[] {
   return data.map(s => {
-    const groups = new Map<string, { sum: number; count: number }>()
+    const groups = new Map<string, { sum: number; count: number; hasAnomaly: boolean }>()
     s.data.forEach(d => {
       const key = truncateDate(d.fiscal_year || '', granularity)
-      const g = groups.get(key) ?? { sum: 0, count: 0 }
+      const g = groups.get(key) ?? { sum: 0, count: 0, hasAnomaly: false }
       groups.set(key, g)
       g.sum += d.value ?? 0
       g.count += 1
+      if (d.is_anomaly) g.hasAnomaly = true
     })
     return {
       ...s,
       data: Array.from(groups.entries()).map(([key, g]) => ({
         fiscal_year: key,
         value: g.sum / g.count,
+        is_anomaly: g.hasAnomaly || undefined,
       })),
     }
   })
@@ -66,6 +68,7 @@ function truncateDate(date: string, granularity: 'day' | 'month' | 'quarter'): s
   if (granularity === 'day') return date.slice(0, 10)
   if (granularity === 'month') return date.slice(0, 7)
   // quarter
+  if (date.length < 7) return date  // 无法判断季度，原样返回
   const month = parseInt(date.slice(5, 7), 10)
   const q = Math.ceil(month / 3)
   return `${date.slice(0, 4)}-Q${q}`

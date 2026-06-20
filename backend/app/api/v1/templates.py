@@ -204,6 +204,8 @@ async def update_template(
 
     # 如果更新了 metrics，需要将 MetricItem 列表转为 JSON 字典列表
     if "metrics" in update_data:
+        if update_data["metrics"] is None:
+            raise HTTPException(status_code=422, detail="metrics 不能为 null")
         update_data["metrics"] = [
             {
                 "key": m.metric_key,

@@ -170,7 +170,11 @@ export function autoAssign(
     const registeredTypes = new Set(matched.map((c) => c.type))
     for (const needed of ['line', 'bar'] as ChartType[]) {
       if (!registeredTypes.has(needed) && registry.has(needed)) {
-        matched.push(registry.get(needed)!)
+        const config = registry.get(needed)!
+        // 复核 isApplicable —— 只追加真正适用的图表类型
+        if (config.isApplicable(metrics, reports)) {
+          matched.push(config)
+        }
       }
     }
   }

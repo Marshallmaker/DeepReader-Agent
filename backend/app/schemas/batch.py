@@ -54,6 +54,7 @@ class BatchDetailResponse(BaseModel):
     processed_files: int
     created_at: datetime
     reports: List[ReportSummary]
+    metric_tags: List[MetricTagInfo] = []
 
     class Config:
         from_attributes = True

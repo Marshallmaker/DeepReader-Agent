@@ -56,13 +56,15 @@ const AutoChartGrid: React.FC<Props> = ({ batchId }) => {
         return
       }
 
-      // 2. 获取对比数据
-      const result = await visualizationService.getComparisonData([batchId], allMetricKeys)
+      // 2. 获取对比数据（柱状图等）
+      const comparisonResult = await visualizationService.getComparisonData([batchId], allMetricKeys)
+      // 也获取趋势数据（折线图）
+      const trendResult = await visualizationService.getTrendData([batchId], allMetricKeys)
 
       // 3. 自动分配图表
       const reports = Array.from(
         new Set(
-          result.series.flatMap(
+          comparisonResult.series.flatMap(
             (s: { data: Array<{ report_name?: string }> }) =>
               s.data.map((d) => d.report_name).filter(Boolean)
           )
@@ -83,7 +85,11 @@ const AutoChartGrid: React.FC<Props> = ({ batchId }) => {
           selectedKeys = allMetricKeys
         }
 
-        const filteredSeries = result.series.filter(
+        // 根据图表类型选择正确的数据源
+        const isTrendType = config.type === 'line'
+        const sourceResult = isTrendType ? trendResult : comparisonResult
+
+        const filteredSeries = sourceResult.series.filter(
           (s: { metric_key: string }) => selectedKeys.includes(s.metric_key)
         )
         return {

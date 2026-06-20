@@ -262,16 +262,41 @@ async def get_batch_detail(
         UploadBatch.id == batch_id,
         UploadBatch.user_id == current_user.id
     ).first()
-    
+
     if not batch:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="批次不存在"
         )
-    
+
+    # 查询批次绑定的指标标签
+    relations = db.query(BatchMetricRelation).filter(
+        BatchMetricRelation.batch_id == batch_id
+    ).all()
+
+    if relations:
+        metric_def_ids = [r.metric_def_id for r in relations]
+        metric_defs = db.query(MetricDefinition).filter(
+            MetricDefinition.id.in_(metric_def_ids)
+        ).order_by(MetricDefinition.is_system.desc(), MetricDefinition.id.asc()).all()
+    else:
+        # 旧批次回退系统指标
+        metric_defs = db.query(MetricDefinition).filter(
+            MetricDefinition.is_system == True
+        ).order_by(MetricDefinition.id.asc()).all()
+
+    metric_tags = [
+        MetricTagInfo(
+            metric_key=md.metric_key,
+            metric_label=md.metric_label,
+            expected_type=md.expected_type.value,
+        )
+        for md in metric_defs
+    ]
+
     # Query reports
     reports = db.query(Report).filter(Report.batch_id == batch_id).all()
-    
+
     report_summaries = [
         ReportSummary(
             id=report.id,
@@ -281,7 +306,7 @@ async def get_batch_detail(
         )
         for report in reports
     ]
-    
+
     return BatchDetailResponse(
         batch_id=batch.id,
         batch_name=batch.batch_name,
@@ -289,7 +314,8 @@ async def get_batch_detail(
         total_files=batch.total_files,
         processed_files=batch.processed_files,
         created_at=batch.created_at,
-        reports=report_summaries
+        reports=report_summaries,
+        metric_tags=metric_tags,
     )
 
 
