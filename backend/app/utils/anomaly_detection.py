@@ -2,6 +2,7 @@
 通用异常检测算法模块。
 支持三种统计方法（中位数偏离、IQR、Z-Score）、自动选择、分组检测。
 """
+import logging
 import statistics
 from typing import List, Dict, Optional
 from dataclasses import dataclass
@@ -133,7 +134,7 @@ def _detect_median_deviation(
 
     for v in values:
         if med == 0:
-            deviation = 0.0 if v == 0 else float("inf")
+            deviation = 0.0 if v == 0 else 1e9  # Large sentinel, safe for JSON
         else:
             deviation = abs(v - med) / abs(med)
 
@@ -158,7 +159,7 @@ def _detect_median_deviation(
             is_anomaly=is_anomaly,
             method=method_name,
             threshold=threshold,
-            deviation=round(deviation, 6) if deviation != float("inf") else deviation,
+            deviation=round(deviation, 6),
             direction=dir_str,
         ))
 
@@ -398,6 +399,8 @@ def detect_batch_anomalies(
 
     numeric_metric_keys = {md.metric_key for md in metric_defs}
     if not numeric_metric_keys:
+        logger = logging.getLogger(__name__)
+        logger.warning("批次 #%d 无可用的 NUMERIC 指标定义，跳过异常检测", batch_id)
         return {}
 
     # ── 获取所有报告 ──
