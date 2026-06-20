@@ -30,6 +30,7 @@ function Dashboard() {
   const [selectedMetricIds, setSelectedMetricIds] = useState<number[]>([])
   const [showMetricSettings, setShowMetricSettings] = useState(false)
   const [showAddMetric, setShowAddMetric] = useState(false)
+  const [editingMetric, setEditingMetric] = useState<MetricDefinition | null>(null)
 
   // ── 可视化 ────────────────────────────────────────────
   const [showChart, setShowChart] = useState(false)
@@ -230,15 +231,18 @@ function Dashboard() {
         selectedIds={selectedMetricIds}
         onSelectionChange={setSelectedMetricIds}
         onClose={() => setShowMetricSettings(false)}
-        onAddMetric={() => setShowAddMetric(true)}
+        onAddMetric={() => { setEditingMetric(null); setShowAddMetric(true) }}
         onDeleteMetric={handleDeleteMetric}
         onRefresh={loadMetrics}
+        onEditMetric={(metric) => { setEditingMetric(metric); setShowAddMetric(true) }}
       />
 
       <AddMetricModal
         open={showAddMetric}
-        onClose={() => setShowAddMetric(false)}
+        onClose={() => { setShowAddMetric(false); setEditingMetric(null) }}
         onCreated={loadMetrics}
+        mode={editingMetric ? 'edit' : 'create'}
+        editTarget={editingMetric}
       />
 
       <ChartModal

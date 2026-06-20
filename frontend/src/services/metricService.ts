@@ -27,6 +27,12 @@ export interface CreateMetricRequest {
   prompt_instruction?: string
 }
 
+export interface UpdateMetricRequest {
+  metric_label?: string
+  expected_type?: 'NUMERIC' | 'TEXT'
+  prompt_instruction?: string
+}
+
 export const metricService = {
   /**
    * 获取当前用户的所有指标定义列表
@@ -41,6 +47,14 @@ export const metricService = {
    */
   async createMetric(data: CreateMetricRequest): Promise<MetricDefinitionResponse> {
     const response = await api.post('/metrics/definitions', data)
+    return response.data
+  },
+
+  /**
+   * 更新指定的指标定义
+   */
+  async updateMetric(id: number, data: UpdateMetricRequest): Promise<MetricDefinitionResponse> {
+    const response = await api.put(`/metrics/definitions/${id}`, data)
     return response.data
   },
 

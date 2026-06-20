@@ -1,5 +1,5 @@
 import { Modal, Button, Checkbox, Tag, message, Space } from 'antd'
-import { SettingOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { SettingOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { MetricDefinition } from '../services/metricService'
 import { extractErrorMessage } from '../utils/errorHandler'
 import TemplateSelector from './TemplateSelector'
@@ -14,11 +14,13 @@ interface MetricSettingsModalProps {
   onDeleteMetric: (id: number) => Promise<void>
   /** 模板导入完成后触发，用于刷新父组件中的指标列表 */
   onRefresh: () => void
+  /** 编辑自定义指标回调 */
+  onEditMetric?: (metric: MetricDefinition) => void
 }
 
 function MetricSettingsModal({
   open, metrics, selectedIds, onSelectionChange,
-  onClose, onAddMetric, onDeleteMetric, onRefresh,
+  onClose, onAddMetric, onDeleteMetric, onRefresh, onEditMetric,
 }: MetricSettingsModalProps) {
   const handleSelectAll = (checked: boolean) => {
     onSelectionChange(checked ? metrics.map(m => m.id) : [])
@@ -73,9 +75,14 @@ function MetricSettingsModal({
               <span className="metric-key">{metric.metric_key}</span>
               <span className="metric-type">{metric.expected_type}</span>
               {!metric.is_system && (
-                <Button type="text" danger onClick={() => handleDelete(metric.id)} className="delete-metric-btn">
-                  <DeleteOutlined />
-                </Button>
+                <>
+                  <Button type="text" onClick={() => onEditMetric?.(metric)} className="edit-metric-btn">
+                    <EditOutlined />
+                  </Button>
+                  <Button type="text" danger onClick={() => handleDelete(metric.id)} className="delete-metric-btn">
+                    <DeleteOutlined />
+                  </Button>
+                </>
               )}
             </div>
           ))}
