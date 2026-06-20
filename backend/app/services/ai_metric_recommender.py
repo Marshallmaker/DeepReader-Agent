@@ -81,7 +81,11 @@ def recommend_metrics_from_report(
             response_format={"type": "json_object"},
         )
         content = response.choices[0].message.content
-        result = json.loads(content)
+        try:
+            result = json.loads(content)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"AI 指标推荐 JSON 解析失败: {e}, 原始内容: {content}")
+            raise RuntimeError("AI 指标推荐返回格式异常，请稍后重试。")
         # 验证返回格式
         if "recommended_metrics" not in result:
             result["recommended_metrics"] = []
@@ -122,7 +126,11 @@ def recommend_metrics_from_text(
             response_format={"type": "json_object"},
         )
         content = response.choices[0].message.content
-        result = json.loads(content)
+        try:
+            result = json.loads(content)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"AI 指标推荐 JSON 解析失败（文本模式）: {e}, 原始内容: {content}")
+            raise RuntimeError("AI 指标推荐返回格式异常，请稍后重试。")
         # 验证返回格式
         if "recommended_metrics" not in result:
             result["recommended_metrics"] = []

@@ -8,6 +8,7 @@ import { RobotOutlined, EditOutlined } from '@ant-design/icons'
 import api from '../services/api'
 import { metricService } from '../services/metricService'
 import { templateService } from '../services/templateService'
+import { extractErrorMessage } from '../utils/errorHandler'
 
 const { Text } = Typography
 
@@ -56,10 +57,7 @@ const AIMetricRecommender: React.FC<Props> = ({ open, onClose, onCreated, batchI
         .map((m) => m.metric_key)
       setSelected(new Set(numericKeys))
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'AI 推荐失败，请稍后重试'
-      message.error(msg)
+      message.error(extractErrorMessage(err, 'AI 推荐失败，请稍后重试'))
     } finally {
       setLoading(false)
     }
@@ -112,8 +110,9 @@ const AIMetricRecommender: React.FC<Props> = ({ open, onClose, onCreated, batchI
           })),
         })
         message.success(`模板「${templateName.trim()}」已保存`)
-      } catch {
-        // 模板保存失败不阻断指标创建
+      } catch (err) {
+        console.warn('模板保存失败', err)
+        message.warning('模板保存失败，但指标创建成功')
       }
     }
 
@@ -129,6 +128,7 @@ const AIMetricRecommender: React.FC<Props> = ({ open, onClose, onCreated, batchI
     setCreating(false)
     setSaveAsTemplate(false)
     setTemplateName('')
+    setReportTypeHint('')
     onClose()
   }
 

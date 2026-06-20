@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.metric_definition import MetricDefinition, ExpectedType
 from app.models.batch import UploadBatch
 from app.models.report import Report
+import asyncio
 from app.services.ai_metric_recommender import recommend_metrics_from_report, recommend_metrics_from_text
 from app.schemas.metric import (
     MetricDefinitionCreate,
@@ -302,7 +303,7 @@ class AIRecommendResponse(BaseModel):
 
 
 @router.post("/ai-recommend", response_model=AIRecommendResponse)
-def ai_recommend_metrics(
+async def ai_recommend_metrics(
     body: AIRecommendRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -325,15 +326,16 @@ def ai_recommend_metrics(
                 detail="未找到可用的 PDF 解析内容，请确保批次中有已完成处理的报告"
             )
 
-        result = recommend_metrics_from_report(
+        result = await asyncio.to_thread(
+            recommend_metrics_from_report,
             report.raw_markdown,
             report_type_hint=body.report_type_hint,
         )
     elif body.report_type_hint:
         # 纯文本模式：用户描述报告类型
-        result = recommend_metrics_from_text(
+        result = await asyncio.to_thread(
+            recommend_metrics_from_text,
             body.report_type_hint,
-            report_type_hint=body.report_type_hint,
         )
     else:
         raise HTTPException(
