@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Modal, Button, Checkbox, Tag, message, Space } from 'antd'
-import { SettingOutlined, PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { SettingOutlined, PlusOutlined, DeleteOutlined, EditOutlined, BulbOutlined } from '@ant-design/icons'
 import { MetricDefinition } from '../services/metricService'
 import { extractErrorMessage } from '../utils/errorHandler'
 import TemplateSelector from './TemplateSelector'
+import AIMetricRecommender from './AIMetricRecommender'
 
 interface MetricSettingsModalProps {
   open: boolean
@@ -22,6 +24,8 @@ function MetricSettingsModal({
   open, metrics, selectedIds, onSelectionChange,
   onClose, onAddMetric, onDeleteMetric, onRefresh, onEditMetric,
 }: MetricSettingsModalProps) {
+  const [showAIRecommender, setShowAIRecommender] = useState(false)
+
   const handleSelectAll = (checked: boolean) => {
     onSelectionChange(checked ? metrics.map(m => m.id) : [])
   }
@@ -59,6 +63,13 @@ function MetricSettingsModal({
           <Space>
             <TemplateSelector onImportComplete={onRefresh} />
             <Button icon={<PlusOutlined />} onClick={onAddMetric} className="add-metric-btn">添加指标</Button>
+            <Button
+              icon={<BulbOutlined />}
+              onClick={() => setShowAIRecommender(true)}
+              className="ai-recommend-btn"
+            >
+              AI 推荐指标
+            </Button>
           </Space>
         </div>
 
@@ -88,6 +99,11 @@ function MetricSettingsModal({
           ))}
         </div>
       </div>
+      <AIMetricRecommender
+        open={showAIRecommender}
+        onClose={() => setShowAIRecommender(false)}
+        onCreated={onRefresh}
+      />
     </Modal>
   )
 }
