@@ -46,8 +46,8 @@ function aggregateByGranularity(data: SeriesData[], granularity: 'day' | 'month'
     const groups = new Map<string, { sum: number; count: number }>()
     s.data.forEach(d => {
       const key = truncateDate(d.fiscal_year || '', granularity)
-      if (!groups.has(key)) groups.set(key, { sum: 0, count: 0 })
-      const g = groups.get(key)!
+      const g = groups.get(key) ?? { sum: 0, count: 0 }
+      groups.set(key, g)
       g.sum += d.value ?? 0
       g.count += 1
     })
@@ -97,7 +97,7 @@ export function useDataReducer(
     if (anomalyFirstEnabled) result = anomalyFirst(result)
     if (granularity) result = aggregateByGranularity(result, granularity)
     if (topN > 0) result = applyTopN(result, topN)
-    if (pageSize > 0 && topN > pageSize) {
+    if (pageSize > 0) {
       const start = (page - 1) * pageSize
       result = result.map(s => ({
         ...s,
