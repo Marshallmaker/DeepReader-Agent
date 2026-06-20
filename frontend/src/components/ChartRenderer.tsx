@@ -27,8 +27,9 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
-import type { SeriesData, ReductionConfig, ChartType } from './charts/ChartRegistry'
-import { buildOption } from './charts/ChartRegistry'
+import type { SeriesData, ReductionConfig, ChartType, ReductionStrategy } from './charts/ChartRegistry'
+import { buildOption, get } from './charts/ChartRegistry'
+import { useDataReducer } from '../hooks/useDataReducer'
 
 // 副作用导入：触发所有图表类型的自注册
 import './charts'
@@ -115,6 +116,14 @@ function ChartRenderer({
 
   const normalizedData = normalizeData(data)
 
+  // ── 降载策略 ─────────────────────────────────────────────────
+  const strategy: ReductionStrategy = get(mappedType)?.defaultReduction ?? {
+    defaultTopN: 15,
+    pageSize: 8,
+  }
+
+  const { reducedData, controls, stats } = useDataReducer(normalizedData, strategy)
+
   if (
     !normalizedData ||
     normalizedData.length === 0 ||
@@ -127,7 +136,7 @@ function ChartRenderer({
     )
   }
 
-  const option = buildOption(mappedType, normalizedData, reduction)
+  const option = buildOption(mappedType, reducedData, reduction)
 
   if (!option) {
     return (
@@ -138,12 +147,101 @@ function ChartRenderer({
   }
 
   return (
-    <ReactEChartsCore
-      echarts={echarts}
-      option={option}
-      style={{ height }}
-      notMerge
-    />
+    <>
+      {stats.hasReduction && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            padding: '8px 0',
+            fontSize: 13,
+          }}
+        >
+          {/* Top-N 选择器 */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            Top-N:
+            <select
+              value={controls.topN}
+              onChange={(e) => controls.setTopN(Number(e.target.value))}
+              style={{ fontSize: 13 }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={0}>全部</option>
+            </select>
+          </label>
+
+          {/* 聚合粒度选择器 */}
+          {strategy.aggregateGranularity && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              聚合:
+              <select
+                value={controls.granularity ?? ''}
+                onChange={(e) =>
+                  controls.setGranularity(
+                    e.target.value
+                      ? (e.target.value as 'day' | 'month' | 'quarter')
+                      : null
+                    )
+                  }
+                style={{ fontSize: 13 }}
+              >
+                <option value="">不聚合</option>
+                <option value="day">按日</option>
+                <option value="month">按月</option>
+                <option value="quarter">按季度</option>
+              </select>
+            </label>
+          )}
+
+          {/* 异常优先复选框 */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+              type="checkbox"
+              checked={controls.anomalyFirst}
+              onChange={(e) => controls.setAnomalyFirst(e.target.checked)}
+            />
+            异常优先
+          </label>
+
+          {/* 分页控件 */}
+          {controls.totalPages > 1 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                disabled={controls.page <= 1}
+                onClick={() => controls.setPage(controls.page - 1)}
+                style={{ fontSize: 13, cursor: controls.page <= 1 ? 'not-allowed' : 'pointer' }}
+              >
+                上一页
+              </button>
+              <span>
+                {controls.page}/{controls.totalPages}
+              </span>
+              <button
+                disabled={controls.page >= controls.totalPages}
+                onClick={() => controls.setPage(controls.page + 1)}
+                style={{ fontSize: 13, cursor: controls.page >= controls.totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                下一页
+              </button>
+            </span>
+          )}
+
+          {/* 降载统计文本 */}
+          <span style={{ color: '#faad14' }}>
+            ⚠️ 已智能降载: 展示 {stats.shown}/{stats.total} 条，隐藏 {stats.hidden} 条普通数据
+          </span>
+        </div>
+      )}
+      <ReactEChartsCore
+        echarts={echarts}
+        option={option}
+        style={{ height }}
+        notMerge
+      />
+    </>
   )
 }
 
