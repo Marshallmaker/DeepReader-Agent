@@ -8,6 +8,7 @@
 
 import * as ChartRegistry from './ChartRegistry'
 import type { ChartTypeConfig, SeriesData, ReductionConfig } from './ChartRegistry'
+import { buildYAxis, assignYAxisIndex } from './ChartRegistry'
 import type { EChartsOption } from 'echarts'
 
 const SERIES_COLORS = [
@@ -31,11 +32,14 @@ const config: ChartTypeConfig = {
     allYearsRaw.sort()
     const allYears = allYearsRaw.slice(0, topN)
 
+    const yAxisIndices = assignYAxisIndex(data)
+
     const series = data.map((s, i) => {
       const color = SERIES_COLORS[i % SERIES_COLORS.length]
       return {
         name: s.metric_label,
         type: 'line' as const,
+        yAxisIndex: yAxisIndices[i],
         smooth: true,
         symbolSize: 6,
         lineStyle: { color, width: 2 },
@@ -63,7 +67,7 @@ const config: ChartTypeConfig = {
         data: allYears,
         axisLabel: { rotate: 30 },
       },
-      yAxis: { type: 'value' as const },
+      yAxis: buildYAxis(data),
       series,
       grid: { left: '10%', right: '8%', bottom: '15%', top: '12%' },
     }

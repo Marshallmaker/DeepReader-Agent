@@ -8,6 +8,7 @@
 
 import * as ChartRegistry from './ChartRegistry'
 import type { ChartTypeConfig, SeriesData, ReductionConfig } from './ChartRegistry'
+import { buildYAxis, assignYAxisIndex } from './ChartRegistry'
 import type { EChartsOption } from 'echarts'
 
 const SERIES_COLORS = [
@@ -37,11 +38,14 @@ const config: ChartTypeConfig = {
     const totalItems = displayNames.length
     const visibleEnd = totalItems > 0 ? Math.min(pageSize / totalItems, 1) * 100 : 100
 
+    const yAxisIndices = assignYAxisIndex(data)
+
     const series = data.map((s, i) => {
       const color = SERIES_COLORS[i % SERIES_COLORS.length]
       return {
         name: s.metric_label,
         type: 'bar' as const,
+        yAxisIndex: yAxisIndices[i],
         itemStyle: {
           color,
           borderRadius: [4, 4, 0, 0] as [number, number, number, number],
@@ -75,7 +79,7 @@ const config: ChartTypeConfig = {
         ),
         axisLabel: { rotate: 45, fontSize: 11 },
       },
-      yAxis: { type: 'value' as const },
+      yAxis: buildYAxis(data),
       series,
       grid: { left: '10%', right: '8%', bottom: '20%', top: '12%' },
     }

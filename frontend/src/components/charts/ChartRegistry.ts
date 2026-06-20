@@ -38,6 +38,62 @@ export interface SeriesData {
   data: DataPoint[]
 }
 
+// ── 双 Y 轴辅助函数 ──────────────────────────────────────────────
+
+/**
+ * 根据序列的量级差异自动构建 Y 轴配置。
+ *
+ * 逻辑：当某个序列的最大值与全局最大值的比值 > 50 倍时，
+ * 启用双 Y 轴（左：主坐标轴，右：次坐标轴），否则使用单 Y 轴。
+ *
+ * @param series 指标序列数组
+ * @returns EChartsOption 中的 yAxis 配置（单个对象或两个对象的数组）
+ */
+export function buildYAxis(series: SeriesData[]): EChartsOption['yAxis'] {
+  if (series.length < 2) return { type: 'value' }
+
+  const maxValues = series.map((s) => {
+    const values = s.data
+      .filter((d) => d.value != null)
+      .map((d) => d.value as number)
+    return values.length > 0 ? Math.max(...values) : 0
+  })
+
+  const maxVal = Math.max(...maxValues, 1)
+  const needsDualAxis = maxValues.some((v) => v > 0 && maxVal / v > 50)
+
+  if (!needsDualAxis) {
+    return { type: 'value' }
+  }
+
+  return [
+    { type: 'value', name: '主坐标轴' },
+    { type: 'value', name: '次坐标轴' },
+  ]
+}
+
+/**
+ * 为每个序列分配 Y 轴索引（0 = 左/主坐标轴，1 = 右/次坐标轴）。
+ *
+ * 量级较小的序列（最大值 < 全局最大值的 1/50）分配到次坐标轴。
+ *
+ * @param series 指标序列数组
+ * @returns 与 series 一一对应的 yAxisIndex 数组
+ */
+export function assignYAxisIndex(series: SeriesData[]): number[] {
+  if (series.length < 2) return series.map(() => 0)
+
+  const maxValues = series.map((s) => {
+    const values = s.data
+      .filter((d) => d.value != null)
+      .map((d) => d.value as number)
+    return values.length > 0 ? Math.max(...values) : 0
+  })
+
+  const maxVal = Math.max(...maxValues, 1)
+  return maxValues.map((v) => (v > 0 && maxVal / v > 50) ? 1 : 0)
+}
+
 export interface ReductionConfig {
   topN?: number
   granularity?: string
