@@ -11,8 +11,9 @@ from app.api.dependencies import get_current_user
 from app.models.user import User
 from app.models.metric_definition import MetricDefinition, ExpectedType
 from app.schemas.metric import (
-    MetricDefinitionCreate, 
-    MetricDefinitionResponse, 
+    MetricDefinitionCreate,
+    MetricUpdate,
+    MetricDefinitionResponse,
     MetricDefinitionListResponse
 )
 import logging
@@ -197,3 +198,77 @@ async def delete_metric_definition(
         "status": "success",
         "message": "指标配置已成功删除，未来异步任务将不再以此指标调度大模型。"
     }
+
+
+@router.put("/definitions/{metric_id}", response_model=MetricDefinitionResponse)
+async def update_metric_definition(
+    metric_id: int,
+    data: MetricUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    更新用户自定义指标定义
+
+    功能说明：
+    - 仅允许修改 metric_label、expected_type、prompt_instruction
+    - metric_key 和 is_system 不可修改
+    - 系统预置指标不可编辑
+    - 非管理员仅可编辑自己的指标
+
+    Args:
+        metric_id: 指标配置项的自增主键
+        data: 待更新的字段（仅传入非 None 的字段会被更新）
+        current_user: 当前登录用户
+        db: 数据库会话
+
+    Returns:
+        更新后的指标定义信息
+    """
+    # 1. 查找指标定义
+    metric = db.query(MetricDefinition).filter(
+        MetricDefinition.id == metric_id
+    ).first()
+
+    if not metric:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="要编辑的指标 ID 不存在"
+        )
+
+    # 2. 系统预置指标不可编辑
+    if metric.is_system:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="系统预置指标不可编辑"
+        )
+
+    # 3. 校验所有权（非管理员仅可编辑自己的指标）
+    if metric.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="尝试编辑不属于自己的指标配置，越权拦截"
+        )
+
+    # 4. 部分更新：仅更新请求中显式传入了的字段
+    update_data = data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(metric, field, value)
+
+    db.commit()
+    db.refresh(metric)
+
+    logger.info(f"用户 {current_user.email} 更新了指标 {metric.id}: {metric.metric_key}")
+
+    return MetricDefinitionResponse(
+        status="success",
+        message="自定义指标配置更新成功。",
+        data={
+            "id": metric.id,
+            "metric_key": metric.metric_key,
+            "metric_label": metric.metric_label,
+            "expected_type": metric.expected_type.value,
+            "prompt_instruction": metric.prompt_instruction,
+            "is_system": metric.is_system
+        }
+    )

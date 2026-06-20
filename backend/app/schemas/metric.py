@@ -24,6 +24,13 @@ class MetricDefinitionCreate(BaseModel):
     prompt_instruction: Optional[str] = Field(None, max_length=500, description="AI 提取该指标时的专属微型提示词")
 
 
+class MetricUpdate(BaseModel):
+    """更新指标定义请求模型（仅允许修改 label、expected_type 和 prompt_instruction）"""
+    metric_label: Optional[str] = Field(None, min_length=1, max_length=100, description="前端界面显示的中文名")
+    expected_type: Optional[ExpectedTypeEnum] = Field(None, description="期望类型")
+    prompt_instruction: Optional[str] = Field(None, max_length=500, description="AI 提取该指标时的专属微型提示词")
+
+
 class MetricDefinitionData(BaseModel):
     """指标定义数据模型"""
     id: int
