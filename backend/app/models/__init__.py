@@ -9,18 +9,20 @@ from app.models.metric import ExtractedMetric
 from app.models.metric_definition import MetricDefinition, BatchMetricRelation, ExpectedType
 from app.models.chat import ChatSession, ChatMessage
 from app.models.password_reset_code import PasswordResetCode
+from app.models.metric_template import MetricTemplate
 
 __all__ = [
-    "User", 
-    "UploadBatch", 
+    "User",
+    "UploadBatch",
     "BatchStatus",
-    "Report", 
+    "Report",
     "ReportStatus",
-    "ExtractedMetric", 
-    "MetricDefinition", 
-    "BatchMetricRelation", 
+    "ExtractedMetric",
+    "MetricDefinition",
+    "BatchMetricRelation",
     "ExpectedType",
-    "ChatSession", 
-    "ChatMessage", 
-    "PasswordResetCode"
+    "ChatSession",
+    "ChatMessage",
+    "PasswordResetCode",
+    "MetricTemplate"
 ]

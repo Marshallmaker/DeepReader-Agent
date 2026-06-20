@@ -39,7 +39,8 @@ def init_db():
     导入所有模型并创建表结构。
     """
     from app.models import (
-        user, batch, report, metric, 
-        metric_definition, chat, password_reset_code
+        user, batch, report, metric,
+        metric_definition, chat, password_reset_code,
+        metric_template  # noqa: F401
     )  # noqa: F401
     Base.metadata.create_all(bind=engine)

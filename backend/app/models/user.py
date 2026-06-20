@@ -25,6 +25,7 @@ class User(Base):
     batches = relationship("UploadBatch", back_populates="user", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
     metric_definitions = relationship("MetricDefinition", back_populates="user", cascade="all, delete-orphan")
+    metric_templates = relationship("MetricTemplate", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', is_admin={self.is_admin})>"
