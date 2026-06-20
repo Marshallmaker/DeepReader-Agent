@@ -16,6 +16,7 @@ from app.schemas.metric import (
     MultiSeriesDataPoint, SeriesData,
     MultiSeriesTrendResponse, MultiSeriesComparisonResponse,
 )
+from app.utils.anomaly_detection import detect_batch_anomalies
 import logging
 
 router = APIRouter()
@@ -157,6 +158,7 @@ async def get_trend_data(
             if m and m.metric_value_num is not None:
                 fiscal_year = _build_fiscal_year(mdict) or str(report.created_at.year)
                 data_points.append(MultiSeriesDataPoint(
+                    report_id=report.id,
                     fiscal_year=fiscal_year,
                     entity_name=report.entity_name,
                     batch_id=report.batch_id,
@@ -172,6 +174,30 @@ async def get_trend_data(
             metric_label=md.metric_label,
             data=data_points,
         ))
+
+    # ── 异常检测：为每个批次独立检测，然后标注数据点 ──
+    unique_batch_ids = set(batch_ids)
+    # {batch_id: {report_id: {metric_key: AnomalyResult}}}
+    all_anomalies: Dict[int, Dict[int, dict]] = {}
+    for bid in unique_batch_ids:
+        try:
+            all_anomalies[bid] = detect_batch_anomalies(
+                db, bid, group_by="stock_code",
+            )
+        except Exception as e:
+            logger.warning(f"异常检测失败 (batch_id={bid}): {e}")
+            all_anomalies[bid] = {}
+
+    for series in series_list:
+        for dp in series.data:
+            if dp.report_id is None:
+                continue
+            batch_anom = all_anomalies.get(dp.batch_id, {})
+            report_anom = batch_anom.get(dp.report_id, {})
+            ar = report_anom.get(series.metric_key)
+            if ar is not None and ar.is_anomaly:
+                dp.is_anomaly = True
+                dp.anomaly_deviation = ar.deviation
 
     return MultiSeriesTrendResponse(
         batch_ids=batch_ids,
@@ -232,6 +258,7 @@ async def get_comparison_data(
 
             if m and m.metric_value_num is not None:
                 data_points.append(MultiSeriesDataPoint(
+                    report_id=report.id,
                     report_name=report_label,
                     entity_name=report.entity_name,
                     batch_id=report.batch_id,
@@ -241,6 +268,7 @@ async def get_comparison_data(
             else:
                 # 无数据也占位，保证 X 轴对齐
                 data_points.append(MultiSeriesDataPoint(
+                    report_id=report.id,
                     report_name=report_label,
                     batch_id=report.batch_id,
                     value=None,
@@ -251,6 +279,29 @@ async def get_comparison_data(
             metric_label=md.metric_label,
             data=data_points,
         ))
+
+    # ── 异常检测：为每个批次独立检测，然后标注数据点 ──
+    unique_batch_ids = set(batch_ids)
+    all_anomalies: Dict[int, Dict[int, dict]] = {}
+    for bid in unique_batch_ids:
+        try:
+            all_anomalies[bid] = detect_batch_anomalies(
+                db, bid, group_by="stock_code",
+            )
+        except Exception as e:
+            logger.warning(f"异常检测失败 (batch_id={bid}): {e}")
+            all_anomalies[bid] = {}
+
+    for series in series_list:
+        for dp in series.data:
+            if dp.report_id is None or dp.value is None:
+                continue
+            batch_anom = all_anomalies.get(dp.batch_id, {})
+            report_anom = batch_anom.get(dp.report_id, {})
+            ar = report_anom.get(series.metric_key)
+            if ar is not None and ar.is_anomaly:
+                dp.is_anomaly = True
+                dp.anomaly_deviation = ar.deviation
 
     return MultiSeriesComparisonResponse(
         batch_ids=batch_ids,

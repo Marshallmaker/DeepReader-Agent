@@ -113,9 +113,12 @@ class MultiSeriesDataPoint(BaseModel):
     fiscal_year: str = ""              # 趋势图 X 轴
     entity_name: Optional[str] = None  # 来源公司
     report_name: Optional[str] = None  # 来源报告（柱状图 X 轴）
+    report_id: Optional[int] = None    # 来源报告 ID（用于异常标注匹配）
     batch_id: Optional[int] = None     # 来源批次
     value: Optional[float] = None
     unit: Optional[str] = None
+    is_anomaly: Optional[bool] = False      # 是否为异常数据点
+    anomaly_deviation: Optional[float] = None  # 异常偏离度
 
 
 class SeriesData(BaseModel):

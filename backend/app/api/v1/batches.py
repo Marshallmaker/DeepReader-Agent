@@ -14,7 +14,7 @@ from app.models.metric import ExtractedMetric
 from app.models.metric_definition import MetricDefinition, BatchMetricRelation
 from app.schemas.batch import BatchResponse, BatchListResponse, BatchDetailResponse, ReportSummary
 from app.schemas.metric import MetricColumnDef, ReportCompareItem, MetricMatrixResponse, MetricTagInfo
-from app.utils.anomaly_detection import detect_anomalies
+from app.utils.anomaly_detection import detect_batch_anomalies
 from app.utils.file import delete_upload_file
 import logging
 
@@ -356,7 +356,13 @@ async def get_batch_comparison(
 
     # 异常检测（容错：检测失败不阻断对比接口）
     try:
-        anomalies = detect_anomalies(db, batch_id)
+        batch_anomalies = detect_batch_anomalies(db, batch_id, group_by="stock_code")
+        # 转换为 ReportCompareItem 需要的字符串格式
+        anomalies = {}
+        for rid, metric_results in batch_anomalies.items():
+            anomalies[rid] = {
+                mk: ar.direction for mk, ar in metric_results.items()
+            }
     except Exception as e:
         logger.warning(f"异常检测失败 (batch_id={batch_id}): {e}")
         anomalies = {}
