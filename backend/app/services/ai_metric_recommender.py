@@ -59,6 +59,7 @@ def recommend_metrics_from_report(
     client = OpenAI(
         api_key=settings.SILICONFLOW_API_KEY,
         base_url=settings.SILICONFLOW_API_BASE,
+        timeout=60.0,
     )
 
     # 截断文本（最多 8000 字符，减少 token 消耗）
@@ -90,7 +91,7 @@ def recommend_metrics_from_report(
         return result
     except Exception as e:
         logger.error(f"AI 指标推荐失败: {e}")
-        raise
+        raise RuntimeError("AI 指标推荐服务暂时不可用，请稍后重试。")
 
 
 def recommend_metrics_from_text(
@@ -102,6 +103,7 @@ def recommend_metrics_from_text(
     client = OpenAI(
         api_key=settings.SILICONFLOW_API_KEY,
         base_url=settings.SILICONFLOW_API_BASE,
+        timeout=60.0,
     )
 
     user_prompt = f"请为以下类型的报告推荐指标体系：{text}"
@@ -119,7 +121,15 @@ def recommend_metrics_from_text(
             max_tokens=2000,
             response_format={"type": "json_object"},
         )
-        return json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        result = json.loads(content)
+        # 验证返回格式
+        if "recommended_metrics" not in result:
+            result["recommended_metrics"] = []
+        for m in result["recommended_metrics"]:
+            m.setdefault("expected_type", "NUMERIC")
+            m.setdefault("prompt_instruction", "")
+        return result
     except Exception as e:
         logger.error(f"AI 指标推荐失败（文本模式）: {e}")
-        raise
+        raise RuntimeError("AI 指标推荐服务暂时不可用，请稍后重试。")
