@@ -1,0 +1,57 @@
+/* ═══════════════════════════════════════════════════════════════
+   AdminPanel — 管理员面板样式
+   ═══════════════════════════════════════════════════════════════ */
+
+.admin-panel {
+  /* 页面容器由 components.css 的 .page-container 处理 */
+}
+
+/* ── 搜索卡片 ────────────────────────────────────────────── */
+.admin-search-card {
+  margin-bottom: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+}
+
+.admin-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── 表格卡片 ────────────────────────────────────────────── */
+.admin-table-card {
+  border-radius: var(--radius-lg);
+}
+
+.admin-table-card .ant-table-thead > tr > th {
+  font-weight: 500;
+}
+
+/* ── 审计代码块 ──────────────────────────────────────────── */
+.audit-code-block {
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow: auto;
+  background: #f8f9fa;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .admin-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-filters .ant-input,
+  .admin-filters .ant-select {
+    width: 100% !important;
+  }
+}

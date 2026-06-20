@@ -1,0 +1,82 @@
+import { Modal, Button, Checkbox, Tag, message } from 'antd'
+import { SettingOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { MetricDefinition } from '../services/metricService'
+import { extractErrorMessage } from '../utils/errorHandler'
+
+interface MetricSettingsModalProps {
+  open: boolean
+  metrics: MetricDefinition[]
+  selectedIds: number[]
+  onSelectionChange: (ids: number[]) => void
+  onClose: () => void
+  onAddMetric: () => void
+  onDeleteMetric: (id: number) => Promise<void>
+}
+
+function MetricSettingsModal({
+  open, metrics, selectedIds, onSelectionChange,
+  onClose, onAddMetric, onDeleteMetric,
+}: MetricSettingsModalProps) {
+  const handleSelectAll = (checked: boolean) => {
+    onSelectionChange(checked ? metrics.map(m => m.id) : [])
+  }
+
+  const handleToggle = (id: number) => {
+    onSelectionChange(
+      selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]
+    )
+  }
+
+  const handleDelete = async (id: number) => {
+    try {
+      await onDeleteMetric(id)
+      message.success('指标删除成功')
+    } catch (error) {
+      message.error(extractErrorMessage(error, '删除失败'))
+    }
+  }
+
+  return (
+    <Modal
+      title={<span className="modal-title"><SettingOutlined /> 指标勾选矩阵</span>}
+      open={open} onCancel={onClose} width={700} className="metric-modal"
+      footer={[<Button key="close" onClick={onClose}>关闭</Button>]}
+    >
+      <div className="metric-matrix">
+        <div className="select-all-row">
+          <Checkbox
+            checked={selectedIds.length === metrics.length && metrics.length > 0}
+            indeterminate={selectedIds.length > 0 && selectedIds.length < metrics.length}
+            onChange={(e) => handleSelectAll(e.target.checked)}
+          >
+            全选 ({metrics.length}个)
+          </Checkbox>
+          <Button icon={<PlusOutlined />} onClick={onAddMetric} className="add-metric-btn">添加指标</Button>
+        </div>
+
+        <div className="metric-list">
+          {metrics.map(metric => (
+            <div key={metric.id} className="metric-item">
+              <Checkbox
+                checked={selectedIds.includes(metric.id)}
+                onChange={() => handleToggle(metric.id)}
+              >
+                <span className="metric-label">{metric.metric_label}</span>
+                {metric.is_system && <Tag color="blue">系统预置</Tag>}
+              </Checkbox>
+              <span className="metric-key">{metric.metric_key}</span>
+              <span className="metric-type">{metric.expected_type}</span>
+              {!metric.is_system && (
+                <Button type="text" danger onClick={() => handleDelete(metric.id)} className="delete-metric-btn">
+                  <DeleteOutlined />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+export default MetricSettingsModal

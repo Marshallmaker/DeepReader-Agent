@@ -1,0 +1,54 @@
+/* ═══════════════════════════════════════════════════════════════
+   VerificationCodeInput — 6位OTP方框输入样式
+   Apple 风格：大圆角、蓝色聚焦光环、柔和填充
+   ═══════════════════════════════════════════════════════════════ */
+
+.otp-container {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.otp-box {
+  width: 48px;
+  height: 54px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: #FFFFFF;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  caret-color: var(--color-primary);
+}
+
+.otp-box:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+  z-index: 1;
+  position: relative;
+}
+
+.otp-box--filled {
+  background: rgba(0, 122, 255, 0.04);
+  border-color: var(--color-primary);
+}
+
+.otp-box:disabled {
+  background: #F5F5F7;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (max-width: 480px) {
+  .otp-container {
+    gap: 8px;
+  }
+  .otp-box {
+    width: 42px;
+    height: 50px;
+    font-size: 20px;
+  }
+}

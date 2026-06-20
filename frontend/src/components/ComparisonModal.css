@@ -1,0 +1,66 @@
+/* ═══════════════════════════════════════════════════════════════
+   ComparisonModal — 对比矩阵弹窗样式
+   Apple 风格：纯白 Modal、浅灰表头、温和异常标注
+   ═══════════════════════════════════════════════════════════════ */
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text);
+}
+
+.metric-table .ant-table-thead > tr > th {
+  background: #FAFAFA !important;
+  color: #6E6E73 !important;
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.anomaly-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+  color: var(--color-text);
+}
+
+.anomaly-warning {
+  background: #FFF7EB;
+  color: #AD6800;
+}
+
+.anomaly-danger {
+  background: #FFF0EF;
+  color: #C41D15;
+}
+
+.anomaly-icon {
+  font-size: var(--font-size-base);
+  margin-left: 4px;
+}
+
+.ai-analysis-btn {
+  border-radius: 10px;
+  transition: background var(--transition-fast);
+}
+
+.ai-analysis-btn:hover {
+  background: rgba(0, 122, 255, 0.06);
+}
+
+.anomaly-legend {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.legend-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

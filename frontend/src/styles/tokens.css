@@ -1,0 +1,97 @@
+/* ═══════════════════════════════════════════════════════════════
+   DeepReader Agent — 设计 Token 体系
+   Apple 风格：克制、纯净、微妙光影
+   所有 CSS 变量集中定义于此，其他样式文件通过 var() 引用
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 品牌色（Apple 系统蓝）──────────────────────────────── */
+  --color-primary: #007AFF;
+  --color-primary-hover: #0062CC;
+  --color-primary-light: rgba(0, 122, 255, 0.08);
+  --color-primary-bg: rgba(0, 122, 255, 0.04);
+
+  /* ── 中性色（Apple 灰度体系）───────────────────────────── */
+  --color-bg-page: #F5F5F7;
+  --color-bg-card: #FFFFFF;
+  --color-bg-hover: #FAFAFA;
+  --color-bg-mask: rgba(0, 0, 0, 0.4);
+
+  --color-text: #1D1D1F;
+  --color-text-secondary: #86868B;
+  --color-text-tertiary: #AEAEB2;
+  --color-text-placeholder: #C7C7CC;
+  --color-text-inverse: #FFFFFF;
+
+  --color-border: #E5E5EA;
+  --color-border-light: #F2F2F7;
+  --color-divider: #F2F2F7;
+
+  /* ── 语义色（Apple 系统色）──────────────────────────────── */
+  --color-success: #34C759;
+  --color-success-bg: #EEFDF2;
+  --color-success-hover: #30B350;
+
+  --color-warning: #FF9500;
+  --color-warning-bg: #FFF7EB;
+
+  --color-error: #FF3B30;
+  --color-error-bg: #FFF0EF;
+
+  --color-info: #007AFF;
+  --color-info-bg: #EEF3FF;
+
+  /* ── 间距（Apple 节奏感）────────────────────────────────── */
+  --spacing-xs: 6px;
+  --spacing-sm: 10px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* ── 圆角（Apple 更大更柔和的圆角）─────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-round: 50%;
+
+  /* ── 阴影（Apple 弥散阴影：发丝线 + 低透明度扩散）─────── */
+  --shadow-sm: 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-modal: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 16px 48px rgba(0, 0, 0, 0.12);
+  --shadow-float: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(0, 0, 0, 0.08);
+
+  /* ── 过渡 ───────────────────────────────────────────────── */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.35s ease;
+
+  /* ── 字体（Apple SF Pro 优先）───────────────────────────── */
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "SF Pro Display", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-family-code: "SF Mono", "Menlo", "Monaco", "Consolas",
+    "Cascadia Code", monospace;
+
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-base: 15px;
+  --font-size-md: 17px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 28px;
+  --font-size-3xl: 34px;
+
+  --line-height: 1.47059;
+
+  /* ── 布局 ───────────────────────────────────────────────── */
+  --header-height: 56px;
+  --sider-width: 220px;
+  --sider-collapsed-width: 64px;
+  --content-max-width: 1400px;
+  --chat-widget-width: 420px;
+  --chat-widget-height: 600px;
+}

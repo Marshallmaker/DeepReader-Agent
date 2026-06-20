@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "ant-design": {
+      "source": "ant-design/antd-skill",
+      "sourceType": "github",
+      "skillPath": "skills/ant-design/SKILL.md",
+      "computedHash": "4d0447d48fced080b2825ecc0fb4d7ca836c8015882899c643acca0b864d5179"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "93f53fd1c0352d3d7ec17b8f73d7351bf76f4821e55d123c9d2abc2c53ba48e4"
+    },
+    "karpathy-guidelines": {
+      "source": "multica-ai/andrej-karpathy-skills",
+      "sourceType": "github",
+      "skillPath": "skills/karpathy-guidelines/SKILL.md",
+      "computedHash": "0ec1641120accbb458780e0bd19a50a4182f2b97863e90851b91307f29802c9f"
+    }
+  }
+}

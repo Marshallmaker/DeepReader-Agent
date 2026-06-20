@@ -1,0 +1,126 @@
+/* ═══════════════════════════════════════════════════════════════
+   BatchTable — 批次列表表格样式
+   Apple 风格：浅灰表头、无悬浮变换、简洁操作按钮
+   ═══════════════════════════════════════════════════════════════ */
+
+.batch-table .ant-table-thead > tr > th {
+  background: #FAFAFA !important;
+  color: #6E6E73 !important;
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--color-divider);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.batch-table .ant-table-tbody > tr:nth-child(even) > td {
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.batch-table .ant-table-tbody > tr:nth-child(odd) > td {
+  background: transparent;
+}
+
+.batch-row {
+  transition: background var(--transition-fast);
+}
+
+.batch-row:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.action-buttons {
+  opacity: 0.7;
+  transition: opacity var(--transition-normal);
+}
+
+.batch-row:hover .action-buttons {
+  opacity: 1;
+}
+
+.action-btn {
+  transition: color var(--transition-fast);
+}
+
+.view-btn:hover {
+  color: var(--color-primary);
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: var(--font-size-xs);
+}
+
+.status-completed {
+  background: #EEFDF2;
+  border-color: #B7EBC8;
+  color: var(--color-success);
+}
+
+.status-processing {
+  background: #EEF3FF;
+  border-color: #B3D4FF;
+  color: var(--color-primary);
+}
+
+.status-pending {
+  background: #F2F2F7;
+  border-color: #E5E5EA;
+  color: var(--color-text-secondary);
+}
+
+.status-failed {
+  background: #FFF0EF;
+  border-color: #FFB3B0;
+  color: var(--color-error);
+}
+
+.status-partial {
+  background: #FFF7EB;
+  border-color: #FFD9A3;
+  color: #CC7A00;
+}
+
+.refresh-btn {
+  border-radius: 10px;
+  transition: background var(--transition-fast);
+}
+
+.refresh-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* 趋势分析按钮 */
+.chart-header-btn {
+  border-radius: 10px;
+  background: rgba(0, 122, 255, 0.06);
+  border: 1px solid rgba(0, 122, 255, 0.15);
+  color: var(--color-primary);
+  transition: all var(--transition-fast);
+}
+
+.chart-header-btn:hover {
+  background: rgba(0, 122, 255, 0.1) !important;
+  border-color: rgba(0, 122, 255, 0.25) !important;
+  color: var(--color-primary) !important;
+}
+
+/* 批次名称可编辑 */
+.batch-name-cell {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.batch-name-cell:hover {
+  background: rgba(0, 122, 255, 0.06);
+}
+
+.edit-btn:hover {
+  color: var(--color-primary) !important;
+}

@@ -1,0 +1,243 @@
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard — 工作台页面专属样式
+   Apple 风格：无装饰背景、纯净卡片、克制交互
+   ═══════════════════════════════════════════════════════════════ */
+
+.dashboard-container {
+  position: relative;
+}
+
+/* ── 工作台内容布局 ──────────────────────────────────────── */
+.dashboard-content {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+.left-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* ── 卡片头部（Dashboard 内嵌卡片用）─────────────────────── */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.card-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title .anticon {
+  font-size: 20px;
+  color: var(--color-text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   以下为 Dashboard 页内弹窗（MetricSettings / AddMetric / Chart）的样式
+   这些弹窗由 Dashboard 页独占，保留在此文件中
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 指标设置弹窗 ────────────────────────────────────────── */
+.metric-matrix {
+  padding: 8px;
+}
+
+.select-all-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border-light);
+  margin-bottom: 12px;
+}
+
+.add-metric-btn {
+  border-radius: 10px;
+  background: var(--color-primary);
+  border: none;
+  color: white;
+}
+
+.add-metric-btn:hover {
+  opacity: 0.9;
+  color: white !important;
+}
+
+.metric-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.metric-item:hover {
+  background: var(--color-primary-bg);
+}
+
+.metric-label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.metric-key {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-code);
+}
+
+.metric-type {
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+  background: rgba(0, 122, 255, 0.08);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.delete-metric-btn {
+  opacity: 0.5;
+  transition: opacity var(--transition-fast);
+}
+
+.delete-metric-btn:hover {
+  opacity: 1;
+}
+
+/* ── 添加指标弹窗 ────────────────────────────────────────── */
+.form-item {
+  margin-bottom: var(--spacing-md);
+}
+
+.form-item label {
+  display: block;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  transition: border-color var(--transition-fast);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.form-select {
+  width: 100%;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  resize: none;
+  transition: border-color var(--transition-fast);
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* ── 可视化图表弹窗 ──────────────────────────────────────── */
+.chart-options {
+  padding: var(--spacing-md);
+  background: rgba(0, 122, 255, 0.03);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.option-row:last-child {
+  margin-bottom: 0;
+}
+
+.option-label {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text);
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.option-select {
+  flex: 1;
+  max-width: 300px;
+}
+
+.chart-container {
+  padding: var(--spacing-md);
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: var(--radius-md);
+}
+
+.chart-title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-title .anticon {
+  font-size: 18px;
+  color: var(--color-text-secondary);
+}
+
+/* ── 响应式 ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .metric-item {
+    flex-wrap: wrap;
+  }
+
+  .option-row {
+    flex-wrap: wrap;
+  }
+
+  .option-label {
+    width: auto;
+  }
+}

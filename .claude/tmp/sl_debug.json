@@ -1,0 +1,47 @@
+{
+  "session_id": "882e998b-3493-49c2-9608-6679b014da16",
+  "transcript_path": "C:\\Users\\周川\\.claude\\projects\\E--CC-T\\882e998b-3493-49c2-9608-6679b014da16.jsonl",
+  "cwd": "E:\\CC_T",
+  "effort": {
+    "level": "high"
+  },
+  "session_name": "fix-project-requirements",
+  "model": {
+    "id": "deepseek-v4-pro",
+    "display_name": "deepseek-v4-pro"
+  },
+  "workspace": {
+    "current_dir": "E:\\CC_T",
+    "project_dir": "E:\\CC_T",
+    "added_dirs": []
+  },
+  "version": "2.1.178",
+  "output_style": {
+    "name": "default"
+  },
+  "cost": {
+    "total_cost_usd": 0.9886939999999999,
+    "total_duration_ms": 682568,
+    "total_api_duration_ms": 105338,
+    "total_lines_added": 21,
+    "total_lines_removed": 2
+  },
+  "context_window": {
+    "total_input_tokens": 72508,
+    "total_output_tokens": 236,
+    "context_window_size": 200000,
+    "current_usage": {
+      "input_tokens": 60,
+      "output_tokens": 236,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 72448
+    },
+    "used_percentage": 36,
+    "remaining_percentage": 64
+  },
+  "exceeds_200k_tokens": false,
+  "fast_mode": false,
+  "thinking": {
+    "enabled": true
+  }
+}

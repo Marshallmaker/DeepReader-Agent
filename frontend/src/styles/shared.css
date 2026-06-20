@@ -1,0 +1,293 @@
+/* ═══════════════════════════════════════════════════════════════
+   DeepReader Agent — 认证页面样式
+   Apple 风格：居中纯白卡片、无品牌面板、无毛玻璃、无动画
+   供 Login.tsx 和 ForgotPassword.tsx 共用
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 认证页容器 ────────────────────────────────────────────── */
+.auth-page-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--color-bg-page);
+  padding: 40px 20px;
+}
+
+/* ── 表单区域（居中布局）───────────────────────────────────── */
+.auth-form-section {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 认证卡片（纯白，无毛玻璃）─────────────────────────────── */
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-xl);
+  padding: 44px 40px;
+  box-shadow: var(--shadow-card);
+  border: none;
+}
+
+.auth-card.wide {
+  max-width: 480px;
+}
+
+/* ── 表单标题 ────────────────────────────────────────────── */
+.form-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+
+.form-subtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+/* ── 自定义输入框（Apple 风格：灰底聚焦变白）──────────────── */
+.custom-input {
+  border-radius: 10px !important;
+  background: #F5F5F7 !important;
+  border: 1px solid transparent !important;
+  transition: all var(--transition-normal);
+  height: 50px;
+}
+
+.custom-input:hover {
+  background: #EEEEF2 !important;
+}
+
+.custom-input:focus,
+.custom-input.ant-input-focused {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
+  background: #FFFFFF !important;
+}
+
+.custom-input input {
+  color: var(--color-text) !important;
+  font-size: var(--font-size-base);
+}
+
+.custom-input input::placeholder {
+  color: var(--color-text-placeholder) !important;
+}
+
+.input-icon {
+  color: var(--color-text-placeholder);
+  font-size: 16px;
+  transition: color var(--transition-normal);
+}
+
+.custom-input:focus .input-icon,
+.custom-input.ant-input-focused .input-icon {
+  color: var(--color-primary);
+}
+
+/* ── 提交按钮（纯色，无渐变，无缩放）─────────────────────── */
+.submit-btn {
+  height: 50px;
+  border-radius: 12px !important;
+  background: var(--color-primary) !important;
+  border: none !important;
+  font-size: 17px;
+  font-weight: 500;
+  transition: background var(--transition-fast);
+  width: 100%;
+}
+
+.submit-btn:hover {
+  background: var(--color-primary-hover) !important;
+}
+
+/* ── 密码强度指示器 ──────────────────────────────────────── */
+.password-strength-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.strength-bars {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+}
+
+.strength-bar {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  transition: background-color var(--transition-normal);
+}
+
+.strength-text {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* ── antd Tabs 认证页定制 ────────────────────────────────── */
+.auth-tabs .ant-tabs-nav {
+  margin-bottom: 24px;
+}
+
+.auth-tabs .ant-tabs-tab {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  padding: 12px 24px;
+  transition: color var(--transition-fast);
+}
+
+.auth-tabs .ant-tabs-tab-active {
+  color: var(--color-primary) !important;
+  font-weight: 600;
+}
+
+.auth-tabs .ant-tabs-ink-bar {
+  background: var(--color-primary) !important;
+  height: 2px !important;
+  border-radius: 1px;
+}
+
+/* ── 登录页专属 ──────────────────────────────────────────── */
+.login-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.remember-checkbox {
+  color: var(--color-text-secondary);
+}
+
+.remember-checkbox .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.forgot-link {
+  color: var(--color-primary) !important;
+  font-size: var(--font-size-base);
+  padding: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.forgot-link:hover {
+  opacity: 0.8;
+}
+
+.register-footer {
+  text-align: center;
+  margin-top: 16px;
+  color: var(--color-text-secondary);
+}
+
+.register-footer span {
+  margin-right: 8px;
+}
+
+.register-footer .ant-btn-link {
+  color: var(--color-primary) !important;
+  font-size: var(--font-size-base);
+  padding: 0;
+}
+
+/* ── 忘记密码页专属 ──────────────────────────────────────── */
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  margin-bottom: 24px;
+  transition: opacity var(--transition-fast);
+}
+
+.back-button:hover {
+  opacity: 0.8;
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.steps-container {
+  margin-bottom: 30px;
+}
+
+.steps-container .ant-steps-item-title {
+  font-size: var(--font-size-sm);
+}
+
+.step-description {
+  color: var(--color-text-secondary);
+  margin-bottom: 20px;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
+.step-description .highlight {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.step-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.step-nav .ant-btn-link {
+  color: var(--color-primary) !important;
+  font-size: var(--font-size-base);
+}
+
+/* ── 成功页面 ────────────────────────────────────────────── */
+.success-container {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.success-icon {
+  font-size: 64px;
+  color: var(--color-success);
+  margin-bottom: 20px;
+}
+
+.success-container h3 {
+  margin-bottom: 10px;
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
+}
+
+.success-container p {
+  color: var(--color-text-secondary);
+  margin-bottom: 30px;
+}
+
+/* ── 响应式 ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .auth-page-container {
+    padding: 20px 16px;
+  }
+
+  .auth-card {
+    padding: 32px 24px;
+    max-width: 100%;
+  }
+}
