@@ -149,7 +149,7 @@ const AIMetricRecommender: React.FC<Props> = ({ open, onClose, onCreated, batchI
       open={open}
       onCancel={handleClose}
       width={700}
-      destroyOnClose
+      destroyOnHidden
       footer={
         result
           ? [
