@@ -240,6 +240,7 @@ function Dashboard() {
         onDeleteMetric={handleDeleteMetric}
         onRefresh={loadMetrics}
         onEditMetric={(metric) => { setEditingMetric(metric); setShowAddMetric(true) }}
+        batchId={selectedBatch ?? undefined}
       />
 
       <AddMetricModal

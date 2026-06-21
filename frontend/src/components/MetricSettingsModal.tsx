@@ -18,11 +18,14 @@ interface MetricSettingsModalProps {
   onRefresh: () => void
   /** 编辑自定义指标回调 */
   onEditMetric?: (metric: MetricDefinition) => void
+  /** 当前选中的批次 ID，传入后 AI 推荐将分析该批次的 PDF 内容 */
+  batchId?: number
 }
 
 function MetricSettingsModal({
   open, metrics, selectedIds, onSelectionChange,
   onClose, onAddMetric, onDeleteMetric, onRefresh, onEditMetric,
+  batchId,
 }: MetricSettingsModalProps) {
   const [showAIRecommender, setShowAIRecommender] = useState(false)
 
@@ -103,6 +106,7 @@ function MetricSettingsModal({
         open={showAIRecommender}
         onClose={() => setShowAIRecommender(false)}
         onCreated={onRefresh}
+        batchId={batchId}
       />
     </Modal>
   )
