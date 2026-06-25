@@ -90,6 +90,21 @@ coverage.xml
 # ========================
 # Claude Code 内部文件
 # ========================
-.claude/skills/
-.claude/worktrees/
-.claude/plans/
+.claude/
+
+# ========================
+# 项目文档（不入库）
+# ========================
+docs/
+项目报告_撰写中/
+工程项目报告.docx
+项目需求文档.md
+启动指南.md
+skills-lock.json
+
+# ========================
+# 测试文件 / 临时数据
+# ========================
+backend/test_upload.pdf
+backend/dump.rdb
+backend/.vite/
