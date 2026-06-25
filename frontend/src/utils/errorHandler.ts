@@ -20,7 +20,11 @@ export function extractErrorMessage(error: unknown, fallback = '操作失败'): 
 
   if (data) {
     // 项目统一格式: { code, message, details }
-    if (typeof data.message === 'string') return data.message
+    if (typeof data.message === 'string') {
+      // 500 服务器内部错误：拼接 details 字段以便定位根因
+      const details = typeof data.details === 'string' ? data.details : ''
+      return details ? `${data.message}（${details}）` : data.message
+    }
     // FastAPI 默认格式: { detail: string }
     if (typeof data.detail === 'string') return data.detail
     // Pydantic 验证错误: { detail: [{ msg, loc, type }] }

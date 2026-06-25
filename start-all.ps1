@@ -283,6 +283,6 @@ color ("=" * 55) Cyan
 color "  入口:      http://localhost:5173" White
 color "  API:       http://localhost:$BackendPort" DarkGray
 color "  API 文档:  http://localhost:$BackendPort/docs" DarkGray
-color "  管理员:    admin@deepreader.com / Admin@123456" DarkGray
+color "  管理员:    15082036178@163.com / 123456Zz@" DarkGray
 color "`n  各服务运行在独立的 PowerShell 最小化窗口中" DarkYellow
 color "  关闭窗口即可停止对应服务`n" DarkYellow

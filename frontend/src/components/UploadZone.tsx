@@ -1,26 +1,33 @@
 import { useState } from 'react'
 import { Upload, Button, Input, message } from 'antd'
-import { UploadOutlined, CloudUploadOutlined, DeleteOutlined, SettingOutlined, TagOutlined } from '@ant-design/icons'
+import { UploadOutlined, CloudUploadOutlined, DeleteOutlined, SettingOutlined, TagOutlined, DownOutlined, UpOutlined, BulbOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import { fileService } from '../services/fileService'
 import { extractErrorMessage } from '../utils/errorHandler'
+import AIMetricRecommender from './AIMetricRecommender'
 import './UploadZone.css'
 
 const { Dragger } = Upload
 
+const MAX_VISIBLE_METRICS = 5
+
 interface UploadZoneProps {
   selectedMetrics: number[]
   metricsLabels: string[]
-  onUploadSuccess: () => void
+  onUploadSuccess: (newBatchId?: number) => void
   onOpenMetricSettings: () => void
+  /** AI 推荐指标后，回传新指标 ID 追加到已选列表 */
+  onMetricsChange?: (ids: number[]) => void
 }
 
-function UploadZone({ selectedMetrics, metricsLabels, onUploadSuccess, onOpenMetricSettings }: UploadZoneProps) {
+function UploadZone({ selectedMetrics, metricsLabels, onUploadSuccess, onOpenMetricSettings, onMetricsChange }: UploadZoneProps) {
   const [fileList, setFileList] = useState<UploadFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const [oversizedFiles, setOversizedFiles] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [batchName, setBatchName] = useState('')
+  const [showAllMetrics, setShowAllMetrics] = useState(false)
+  const [showAIRecommender, setShowAIRecommender] = useState(false)
 
   const handleFileChange = ({ fileList: newFileList }: { fileList: UploadFile[] }) => {
     const maxSize = 20 * 1024 * 1024
@@ -59,7 +66,7 @@ function UploadZone({ selectedMetrics, metricsLabels, onUploadSuccess, onOpenMet
       setFileList([])
       setOversizedFiles([])
       setBatchName('')
-      onUploadSuccess()
+      onUploadSuccess(response.batch_id)
     } catch (error) {
       message.error(extractErrorMessage(error, '上传失败'))
     } finally {
@@ -123,6 +130,13 @@ function UploadZone({ selectedMetrics, metricsLabels, onUploadSuccess, onOpenMet
         >
           开始上传
         </Button>
+        <Button
+          icon={<BulbOutlined />}
+          onClick={() => setShowAIRecommender(true)}
+          className="ai-recommend-upload-btn"
+        >
+          AI 推荐指标
+        </Button>
         {fileList.length > 0 && (
           <Button
             onClick={() => { setFileList([]); setOversizedFiles([]); setBatchName('') }}
@@ -147,9 +161,34 @@ function UploadZone({ selectedMetrics, metricsLabels, onUploadSuccess, onOpenMet
       <div className="selected-metrics-hint">
         <span className="hint-label">已选指标 ({selectedMetrics.length}个):</span>
         <span className="hint-value">
-          {metricsLabels.join(', ') || '未选择'}
+          {metricsLabels.length === 0
+            ? '未选择'
+            : showAllMetrics || metricsLabels.length <= MAX_VISIBLE_METRICS
+              ? metricsLabels.join(', ')
+              : metricsLabels.slice(0, MAX_VISIBLE_METRICS).join(', ') + '…'}
         </span>
+        {metricsLabels.length > MAX_VISIBLE_METRICS && (
+          <span
+            className="hint-toggle"
+            onClick={() => setShowAllMetrics(!showAllMetrics)}
+          >
+            {showAllMetrics ? <><UpOutlined /> 收起</> : <><DownOutlined /> 等 {metricsLabels.length} 个</>}
+          </span>
+        )}
       </div>
+
+      <AIMetricRecommender
+        open={showAIRecommender}
+        onClose={() => setShowAIRecommender(false)}
+        onCreated={() => {}}
+        pendingFiles={fileList.length > 0 ? fileList : undefined}
+        onApply={(ids) => {
+          if (onMetricsChange) {
+            const uniqueIds = [...new Set([...selectedMetrics, ...ids])]
+            onMetricsChange(uniqueIds)
+          }
+        }}
+      />
     </div>
   )
 }

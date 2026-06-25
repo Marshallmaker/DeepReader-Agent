@@ -14,7 +14,7 @@ from app.models.report import Report, ReportStatus
 from app.models.metric import ExtractedMetric
 from app.models.metric_definition import MetricDefinition, BatchMetricRelation
 from app.schemas.file import FileListItem, FileListResponse
-from app.utils.file import calculate_md5, save_upload_file, delete_upload_file
+from app.utils.file import calculate_md5, save_upload_file, delete_upload_file, resolve_stored_path
 from app.config import settings
 from app.tasks.pdf_processor import process_batch
 from jose import jwt, JWTError
@@ -71,6 +71,22 @@ def _try_dispatch(batch_id: int) -> bool:
         return False
 
 
+def _cleanup_orphan_batch(db: Session, batch_id: int) -> None:
+    """
+    清理孤儿批次及其关联记录。
+    当上传流程在批次创建后失败时调用，避免数据库中残留空批次。
+    """
+    try:
+        batch = db.query(UploadBatch).filter(UploadBatch.id == batch_id).first()
+        if batch:
+            db.delete(batch)
+            db.commit()
+            logger.info(f"已清理孤儿批次 {batch_id}")
+    except Exception as e:
+        logger.error(f"清理孤儿批次 {batch_id} 失败: {e}")
+        db.rollback()
+
+
 def _resolve_metric_ids(db: Session, user_id: int, metric_ids: list[int]) -> list[int]:
     """
     解析指标 ID 列表：若用户未勾选任何指标，自动回退到系统预置指标。
@@ -82,15 +98,34 @@ def _resolve_metric_ids(db: Session, user_id: int, metric_ids: list[int]) -> lis
     if metric_ids:
         return metric_ids
 
-    # 兜底：加载系统预置指标（is_system=True，对所有用户可见）
+    # 兜底：加载系统预置指标（is_system=True 且 is_active=True，对所有用户可见）
     system_metrics = db.query(MetricDefinition.id).filter(
-        MetricDefinition.is_system == True
+        MetricDefinition.is_system == True,
+        MetricDefinition.is_active == True
     ).all()
     return [m.id for m in system_metrics]
 
 
 def _bind_metrics_to_batch(db: Session, batch_id: int, metric_ids: list[int]) -> None:
     """将指标绑定到批次（写入 batch_metric_relations 表）。"""
+    if not metric_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无法解析指标集：数据库中没有可用的系统预置指标，请联系管理员创建指标"
+        )
+
+    # 预检：确保所有 metric_def_id 在数据库中存在，避免 FK 违规导致 500
+    existing_ids = {
+        row[0] for row in
+        db.query(MetricDefinition.id).filter(MetricDefinition.id.in_(metric_ids)).all()
+    }
+    invalid_ids = [mid for mid in metric_ids if mid not in existing_ids]
+    if invalid_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"以下指标 ID 不存在或已被删除: {invalid_ids}"
+        )
+
     for metric_def_id in metric_ids:
         relation = BatchMetricRelation(
             batch_id=batch_id,
@@ -194,45 +229,56 @@ async def upload_files(
     db.refresh(new_batch)
 
     # 2.5: 解析指标集并绑定到批次（双模分流：空→系统默认，非空→用户勾选）
-    resolved_ids = _resolve_metric_ids(db, current_user.id, metric_ids)
-    _bind_metrics_to_batch(db, new_batch.id, resolved_ids)
+    # 若此步骤失败，回滚已创建的批次避免孤儿记录
+    try:
+        resolved_ids = _resolve_metric_ids(db, current_user.id, metric_ids)
+        _bind_metrics_to_batch(db, new_batch.id, resolved_ids)
 
-    for pf in processed_files:
-        if pf["existing_report"]:
-            # 复用已有文件 — 同时复用已提取的指标
-            new_report = Report(
-                batch_id=new_batch.id,
-                original_filename=pf["filename"],
-                stored_path=pf["existing_report"].stored_path,
-                pdf_md5=pf["md5"],
-                file_size=len(pf["content"]),
-                status=ReportStatus.SUCCESS,  # 已有文件直接标记成功
-                raw_markdown=pf["existing_report"].raw_markdown
-            )
-            db.add(new_report)
-            db.commit()
-            db.refresh(new_report)
+        for pf in processed_files:
+            if pf["existing_report"]:
+                # 复用已有文件 — 同时复用已提取的指标
+                new_report = Report(
+                    batch_id=new_batch.id,
+                    original_filename=pf["filename"],
+                    stored_path=pf["existing_report"].stored_path,
+                    pdf_md5=pf["md5"],
+                    file_size=len(pf["content"]),
+                    status=ReportStatus.SUCCESS,  # 已有文件直接标记成功
+                    raw_markdown=pf["existing_report"].raw_markdown,
+                    entity_name=pf["existing_report"].entity_name,  # 复用已提取的公司名称
+                )
+                db.add(new_report)
+                db.commit()
+                db.refresh(new_report)
 
-            # 复制已提取的指标到新报告
-            _copy_metrics(db, pf["existing_report"].id, new_report.id)
-            new_batch.processed_files += 1
-        else:
-            # 保存新文件
-            stored_path, _ = save_upload_file(pf["content"], pf["filename"], current_user.id)
+                # 复制已提取的指标到新报告
+                _copy_metrics(db, pf["existing_report"].id, new_report.id)
+                new_batch.processed_files += 1
+            else:
+                # 保存新文件
+                stored_path, _ = save_upload_file(pf["content"], pf["filename"], current_user.id)
 
-            new_report = Report(
-                batch_id=new_batch.id,
-                original_filename=pf["filename"],
-                stored_path=stored_path,
-                pdf_md5=pf["md5"],
-                file_size=len(pf["content"]),
-                status=ReportStatus.PENDING
-            )
-            db.add(new_report)
-            db.commit()
+                new_report = Report(
+                    batch_id=new_batch.id,
+                    original_filename=pf["filename"],
+                    stored_path=stored_path,
+                    pdf_md5=pf["md5"],
+                    file_size=len(pf["content"]),
+                    status=ReportStatus.PENDING
+                )
+                db.add(new_report)
+                db.commit()
 
-    # 更新批次的 processed_files 计数
-    db.commit()
+        # 更新批次的 processed_files 计数
+        db.commit()
+    except HTTPException:
+        # 验证类异常：清理已创建的批次后重新抛出（FastAPI 转为 4xx 响应）
+        _cleanup_orphan_batch(db, new_batch.id)
+        raise
+    except Exception:
+        # 未知异常：清理批次 + 重新抛出（由全局异常处理器记录日志并返回 500）
+        _cleanup_orphan_batch(db, new_batch.id)
+        raise
 
     # 获取批次中所有报告的最终状态
     pending_count = db.query(Report).filter(
@@ -309,8 +355,13 @@ async def delete_report(
         # 批次内仅剩此报告，直接删除整个批次
         db.delete(batch)
         db.commit()
+        # 安全删除：只有当没有其他报告引用同一物理文件时才删除磁盘文件
         if stored_path:
-            delete_upload_file(stored_path)
+            remaining = db.query(Report).filter(
+                Report.stored_path == stored_path
+            ).count()
+            if remaining == 0:
+                delete_upload_file(stored_path)
         return {"message": f"报告 #{report_id} 及所属批次已删除"}
     else:
         # 仅删除单个报告，更新批次计数
@@ -320,8 +371,13 @@ async def delete_report(
             if report.status == ReportStatus.SUCCESS:
                 batch.processed_files = max(0, batch.processed_files - 1)
         db.commit()
+        # 安全删除：只有当没有其他报告引用同一物理文件时才删除磁盘文件
         if stored_path:
-            delete_upload_file(stored_path)
+            remaining = db.query(Report).filter(
+                Report.stored_path == stored_path
+            ).count()
+            if remaining == 0:
+                delete_upload_file(stored_path)
         return {"message": f"报告 #{report_id} 已删除"}
 
 
@@ -374,6 +430,7 @@ class ReportContentResponse(BaseModel):
     file_size: int
     raw_markdown: Optional[str] = None
     metrics_count: int = 0
+    pdf_exists: bool = True
     created_at: str
 
 
@@ -399,6 +456,11 @@ async def get_report_content(
         ExtractedMetric.report_id == report_id
     ).count()
 
+    # 检查磁盘上的 PDF 文件是否存在
+    pdf_exists = False
+    if report.stored_path:
+        pdf_exists = resolve_stored_path(report.stored_path).exists()
+
     return ReportContentResponse(
         report_id=report.id,
         filename=report.original_filename,
@@ -409,6 +471,7 @@ async def get_report_content(
         file_size=report.file_size or 0,
         raw_markdown=report.raw_markdown,
         metrics_count=metrics_count,
+        pdf_exists=pdf_exists,
         created_at=report.created_at.isoformat() if report.created_at else "",
     )
 
@@ -449,12 +512,9 @@ async def get_report_pdf(
     if not current_user.is_admin and (not batch or batch.user_id != current_user.id):
         raise HTTPException(status_code=403, detail="无权访问此报告")
 
-    stored_path = Path(report.stored_path)
-    # 兜底：兼容历史相对路径（相对于 UPLOAD_DIR 解析）
-    if not stored_path.is_absolute():
-        stored_path = Path(settings.UPLOAD_DIR).resolve() / report.stored_path
+    stored_path = resolve_stored_path(report.stored_path)
     if not stored_path.exists():
-        raise HTTPException(status_code=404, detail="PDF 文件不存在或已被删除")
+        raise HTTPException(status_code=404, detail="PDF 文件已从磁盘丢失，请重新上传该报告")
 
     return FileResponse(
         stored_path,
@@ -472,6 +532,7 @@ async def get_files(
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     batch_id: Optional[int] = Query(None, description="按批次筛选"),
     status_filter: Optional[str] = Query(None, alias="status", description="按状态筛选"),
+    filename: Optional[str] = Query(None, description="按文件名模糊搜索"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -488,6 +549,8 @@ async def get_files(
         query = query.filter(Report.batch_id == batch_id)
     if status_filter:
         query = query.filter(Report.status == status_filter)
+    if filename:
+        query = query.filter(Report.original_filename.ilike(f"%{filename}%"))
 
     # 总数
     total = query.count()

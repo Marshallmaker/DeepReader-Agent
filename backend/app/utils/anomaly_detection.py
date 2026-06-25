@@ -391,9 +391,10 @@ def detect_batch_anomalies(
             MetricDefinition.expected_type == ExpectedType.NUMERIC,
         ).all()
     else:
-        # 旧批次回退：使用系统预置指标
+        # 旧批次回退：使用系统预置指标（仅启用的）
         metric_defs = db.query(MetricDefinition).filter(
             MetricDefinition.is_system == True,
+            MetricDefinition.is_active == True,
             MetricDefinition.expected_type == ExpectedType.NUMERIC,
         ).all()
 

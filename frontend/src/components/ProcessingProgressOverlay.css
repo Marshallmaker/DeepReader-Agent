@@ -1,0 +1,88 @@
+/* ═══════════════════════════════════════════════════════════════
+   ProcessingProgressOverlay — 弹出式进度卡片
+   醒目的大卡片，位于页面顶部，带滑入动画和 shimmer 扫光效果
+   ═══════════════════════════════════════════════════════════════ */
+
+.processing-overlay-card {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%);
+  box-shadow: 0 4px 20px rgba(0, 122, 255, 0.15);
+  border: 1px solid rgba(0, 122, 255, 0.1);
+  animation: overlay-slide-in 0.4s ease-out;
+}
+
+@keyframes overlay-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.processing-overlay-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.processing-overlay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.processing-overlay-item {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+}
+
+.processing-overlay-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   大号进度条 shimmer 扫光动画
+   ═══════════════════════════════════════════════════════════════ */
+
+.processing-overlay-progress .ant-progress-bg {
+  position: relative;
+  overflow: hidden;
+  height: 16px !important;
+}
+
+.processing-overlay-progress .ant-progress-inner {
+  height: 16px !important;
+  border-radius: 8px;
+}
+
+.processing-overlay-progress .ant-progress-bg::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 100%
+  );
+  animation: progress-shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes progress-shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}

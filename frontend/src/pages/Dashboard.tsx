@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { message } from 'antd'
 import { BarChartOutlined, FileTextOutlined, SyncOutlined } from '@ant-design/icons'
 import { batchService, BatchResponse, ReportCompareItem, MetricColumnDef } from '../services/batchService'
@@ -10,8 +10,32 @@ import MetricSettingsModal from '../components/MetricSettingsModal'
 import AddMetricModal from '../components/AddMetricModal'
 import ChartModal from '../components/ChartModal'
 import AutoChartGrid from '../components/AutoChartGrid'
+import ProcessingProgressOverlay from '../components/ProcessingProgressOverlay'
 import '../styles/components.css'
 import './Dashboard.css'
+
+const SELECTED_METRICS_KEY = 'deepreader_selected_metric_ids'
+
+/**
+ * 从 localStorage 恢复用户勾选的指标 ID 列表
+ */
+function loadSavedMetricIds(): number[] {
+  try {
+    const stored = localStorage.getItem(SELECTED_METRICS_KEY)
+    return stored ? JSON.parse(stored) : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 将用户勾选的指标 ID 列表持久化到 localStorage
+ */
+function saveMetricIds(ids: number[]) {
+  try {
+    localStorage.setItem(SELECTED_METRICS_KEY, JSON.stringify(ids))
+  } catch { /* 静默失败 */ }
+}
 
 function Dashboard() {
   // ── 批次列表 ──────────────────────────────────────────
@@ -28,10 +52,12 @@ function Dashboard() {
 
   // ── 指标管理 ──────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricDefinition[]>([])
-  const [selectedMetricIds, setSelectedMetricIds] = useState<number[]>([])
+  const [selectedMetricIds, setSelectedMetricIds] = useState<number[]>(loadSavedMetricIds)
   const [showMetricSettings, setShowMetricSettings] = useState(false)
   const [showAddMetric, setShowAddMetric] = useState(false)
   const [editingMetric, setEditingMetric] = useState<MetricDefinition | null>(null)
+  // 标记是否已完成首次指标加载（用于判断是否需要默认全选）
+  const metricsInitialized = useRef(false)
 
   // ── 可视化 ────────────────────────────────────────────
   const [showChart, setShowChart] = useState(false)
@@ -43,11 +69,28 @@ function Dashboard() {
     try {
       const response = await metricService.getMetricDefinitions()
       setMetrics(response.data)
-      // 默认选中所有指标（系统预设 + 用户自定义），用户可在指标设置中自由调整
-      const allIds = response.data.map((m: MetricDefinition) => m.id)
-      setSelectedMetricIds(allIds)
+      // 仅首次加载且无历史记录时，默认全选；同时剔除 localStorage 中已失效的 ID
+      if (!metricsInitialized.current) {
+        metricsInitialized.current = true
+        const savedIds = loadSavedMetricIds()
+        if (savedIds.length === 0) {
+          const allIds = response.data.map((m: MetricDefinition) => m.id)
+          setSelectedMetricIds(allIds)
+          saveMetricIds(allIds)
+        } else {
+          // 验证缓存的 ID 是否仍然有效，过滤掉已被删除的指标
+          const validIds = new Set(response.data.map((m: MetricDefinition) => m.id))
+          const cleaned = savedIds.filter((id: number) => validIds.has(id))
+          if (cleaned.length !== savedIds.length) {
+            const removed = savedIds.filter((id: number) => !validIds.has(id))
+            console.warn(`[Dashboard] 已自动清除失效指标 ID: ${removed.join(', ')}（可能已被删除）`)
+            setSelectedMetricIds(cleaned)
+            saveMetricIds(cleaned)
+          }
+        }
+      }
     } catch {
-      /* 静默失败 */
+      message.error('加载指标定义失败，请刷新页面重试')
     }
   }, [])
 
@@ -72,6 +115,25 @@ function Dashboard() {
     loadBatches(1, 10)
     loadMetrics()
   }, [loadBatches, loadMetrics])
+
+  // 每次 selectedMetricIds 变化时持久化到 localStorage
+  useEffect(() => {
+    saveMetricIds(selectedMetricIds)
+  }, [selectedMetricIds])
+
+  // 批次处理中时自动轮询刷新进度（每 3 秒）
+  useEffect(() => {
+    const hasActive = batches.some(
+      b => b.status === 'processing' || b.status === 'pending'
+    )
+    if (!hasActive) return
+
+    const timer = setInterval(() => {
+      loadBatches(pagination.current, pagination.pageSize)
+    }, 3000)
+
+    return () => clearInterval(timer)
+  }, [batches, pagination.current, pagination.pageSize, loadBatches])
 
   // ── 统计数据 ──────────────────────────────────────────
   const stats = useMemo(() => {
@@ -194,11 +256,19 @@ function Dashboard() {
 
         {/* 主工作区 */}
         <div className="left-workspace">
+          <ProcessingProgressOverlay batches={batches} />
           <UploadZone
             selectedMetrics={selectedMetricIds}
             metricsLabels={selectedLabels}
-            onUploadSuccess={() => loadBatches(1, pagination.pageSize)}
+            onUploadSuccess={(newBatchId) => {
+              loadBatches(1, pagination.pageSize)
+              if (newBatchId) setSelectedBatch(newBatchId)
+            }}
             onOpenMetricSettings={() => setShowMetricSettings(true)}
+            onMetricsChange={(newIds) => {
+              setSelectedMetricIds(newIds)
+              loadMetrics()
+            }}
           />
 
           <BatchTable
@@ -213,6 +283,8 @@ function Dashboard() {
             onDeleteBatch={handleDeleteBatch}
             onRenameBatch={handleRenameBatch}
             onDeleteAllBatches={handleDeleteAllBatches}
+            selectedBatchId={selectedBatch}
+            onSelectBatch={setSelectedBatch}
           />
         </div>
       </div>

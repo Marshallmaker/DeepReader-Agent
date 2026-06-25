@@ -86,3 +86,10 @@ coverage.xml
 *.tmp
 *.temp
 .cache/
+
+# ========================
+# Claude Code 内部文件
+# ========================
+.claude/skills/
+.claude/worktrees/
+.claude/plans/

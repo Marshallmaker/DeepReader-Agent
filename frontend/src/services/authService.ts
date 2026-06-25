@@ -49,16 +49,33 @@ export const authService = {
       password,
       remember_me: rememberMe
     })
-    
+
     const { access_token, is_admin } = response.data
-    
+
+    // 第一步：先写入 token（使后续 /auth/me 请求能通过认证）
     useAuthStore.getState().setAuth(access_token, {
       id: 0,
       email: email,
       nickname: null,
       isAdmin: is_admin
     })
-    
+
+    // 第二步：获取完整用户信息（真实 id、昵称、头像等）
+    try {
+      const userResponse = await api.get('/auth/me')
+      const u = userResponse.data
+      useAuthStore.getState().setAuth(access_token, {
+        id: u.id,
+        email: u.email,
+        nickname: u.nickname,
+        isAdmin: u.is_admin,
+        avatarUrl: u.avatar_url,
+      })
+    } catch {
+      // /auth/me 失败时保留临时信息，Layout 中的 useEffect 会兜底重试
+      console.error('登录后获取用户信息失败，将在后续自动重试')
+    }
+
     return response.data
   },
   

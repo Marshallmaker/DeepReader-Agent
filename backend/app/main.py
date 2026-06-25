@@ -1,6 +1,7 @@
 """
 DeepReader Agent - Main FastAPI Application
 """
+import logging
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,6 +13,8 @@ from app.config import settings, ensure_upload_dir
 from app.database import init_db
 from app.api.v1 import api_router
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,11 +23,9 @@ async def lifespan(app: FastAPI):
     ensure_upload_dir()
     init_db()
     # 输出关键配置（方便调试）
-    import logging
-    _log = logging.getLogger("startup")
-    _log.info(f"SMTP: {settings.SMTP_SERVER}:{settings.SMTP_PORT} "
-              f"sandbox={settings.MAIL_SANDBOX_MODE} "
-              f"user={settings.SMTP_USERNAME}")
+    logger.info(f"SMTP: {settings.SMTP_SERVER}:{settings.SMTP_PORT} "
+                f"sandbox={settings.MAIL_SANDBOX_MODE} "
+                f"user={settings.SMTP_USERNAME}")
     yield
     # Shutdown
     pass
@@ -101,6 +102,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # Global exception handler
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for consistent error responses."""
+    import traceback
+    logger.error(f"未捕获异常 {request.method} {request.url.path}: {exc}\n{traceback.format_exc()}")
     return JSONResponse(
         status_code=500,
         content={

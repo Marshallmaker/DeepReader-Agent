@@ -93,56 +93,64 @@ def create_system_metric_definitions():
                 "metric_label": "公司名称",
                 "expected_type": ExpectedType.TEXT,
                 "prompt_instruction": "提取报告顶部的公司名称",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             },
             {
                 "metric_key": "stock_code",
                 "metric_label": "证券代号",
                 "expected_type": ExpectedType.TEXT,
                 "prompt_instruction": "提取标准的5位主板港股代号字符串（不足5位的前面强制补0）",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             },
             {
                 "metric_key": "submission_date",
                 "metric_label": "呈交日期",
                 "expected_type": ExpectedType.TEXT,
                 "prompt_instruction": "提取呈交日期，统一规整为YYYY-MM-DD格式",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             },
             {
                 "metric_key": "repurchase_date",
                 "metric_label": "交易日",
                 "expected_type": ExpectedType.TEXT,
                 "prompt_instruction": "从第二章節購回報告表格中提取交易日，统一规整为YYYY-MM-DD格式",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             },
             {
                 "metric_key": "shares_repurchased",
                 "metric_label": "购回股份数目",
                 "expected_type": ExpectedType.NUMERIC,
                 "prompt_instruction": "从第二章節購回報告表格中提取购回股份数目，剔除所有非数字文本",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             },
             {
                 "metric_key": "highest_price_paid",
                 "metric_label": "每股最高购回价",
                 "expected_type": ExpectedType.NUMERIC,
                 "prompt_instruction": "从第二章節購回報告表格中提取每股最高购回价，剔除货币符号和千分位符",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             },
             {
                 "metric_key": "lowest_price_paid",
                 "metric_label": "每股最低购回价",
                 "expected_type": ExpectedType.NUMERIC,
                 "prompt_instruction": "从第二章節購回報告表格中提取每股最低购回价，剔除货币符号和千分位符",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             },
             {
                 "metric_key": "total_consideration",
                 "metric_label": "付出价格总额",
                 "expected_type": ExpectedType.NUMERIC,
                 "prompt_instruction": "从第二章節購回報告表格中提取付出的价格总额，剔除货币符号和千分位符",
-                "is_system": True
+                "is_system": True,
+                "is_active": True
             }
         ]
         
@@ -160,7 +168,8 @@ def create_system_metric_definitions():
                 metric_label=metric_data["metric_label"],
                 expected_type=metric_data["expected_type"],
                 prompt_instruction=metric_data["prompt_instruction"],
-                is_system=metric_data["is_system"]
+                is_system=metric_data["is_system"],
+                is_active=metric_data.get("is_active", True)
             )
             db.add(metric)
         
@@ -242,6 +251,7 @@ def create_system_templates():
             description=hk_template["description"],
             category=hk_template["category"],
             is_system=True,
+            is_active=True,
             user_id=None,
             metrics=hk_template["metrics"]
         )
@@ -253,6 +263,7 @@ def create_system_templates():
             description=a_share_template["description"],
             category=a_share_template["category"],
             is_system=True,
+            is_active=True,
             user_id=None,
             metrics=a_share_template["metrics"]
         )
@@ -268,20 +279,49 @@ def create_system_templates():
         db.close()
 
 
+def migrate_metric_template_is_active():
+    """迁移：为 metric_templates 表添加 is_active 字段（幂等）。"""
+    from sqlalchemy import text
+    try:
+        engine = create_engine(settings.DATABASE_URL)
+        with engine.connect() as conn:
+            # MySQL 8.0+ 支持 IF NOT EXISTS 语法
+            result = conn.execute(text("""
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'metric_templates'
+                  AND COLUMN_NAME = 'is_active'
+            """))
+            if result.scalar() > 0:
+                conn.close()
+                return
+            conn.execute(text(
+                "ALTER TABLE metric_templates ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1"
+            ))
+            conn.commit()
+            print("迁移完成：已为 metric_templates 表添加 is_active 字段")
+    except Exception as e:
+        print(f"迁移 metric_templates.is_active 时出错: {e}")
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("DeepReader Agent 数据库初始化")
     print("=" * 60)
-    
+
+    # 执行迁移（幂等）
+    print("正在检查并执行数据库迁移...")
+    migrate_metric_template_is_active()
+
     # 创建数据库
     if create_database_if_not_exists():
         # 初始化表
         print("正在初始化数据库表...")
         init_db()
-        
+
         # 创建管理员用户
         create_admin_user()
-        
+
         # 创建系统预置指标
         create_system_metric_definitions()
 

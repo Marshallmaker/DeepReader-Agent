@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Modal, Button, Select, message } from 'antd'
 import { metricService, CreateMetricRequest, MetricDefinition, UpdateMetricRequest } from '../services/metricService'
 import { extractErrorMessage } from '../utils/errorHandler'
+import { useDraggableModal } from '../hooks/useDraggableModal'
 
 const { Option } = Select
 
@@ -16,6 +17,7 @@ interface AddMetricModalProps {
 }
 
 function AddMetricModal({ open, onClose, onCreated, mode = 'create', editTarget = null }: AddMetricModalProps) {
+  const { modalRender } = useDraggableModal()
   const isEdit = mode === 'edit'
 
   const [form, setForm] = useState<CreateMetricRequest>({
@@ -67,6 +69,7 @@ function AddMetricModal({ open, onClose, onCreated, mode = 'create', editTarget 
 
   return (
     <Modal
+      modalRender={modalRender}
       title={isEdit ? '编辑指标' : '添加自定义指标'}
       open={open} onCancel={onClose} width={500} className="add-metric-modal"
       footer={[

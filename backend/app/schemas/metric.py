@@ -39,6 +39,7 @@ class MetricDefinitionData(BaseModel):
     expected_type: str
     prompt_instruction: Optional[str] = None
     is_system: bool = False
+    is_active: bool = True
 
 
 class MetricDefinitionResponse(BaseModel):
@@ -52,6 +53,25 @@ class MetricDefinitionListResponse(BaseModel):
     """指标定义列表响应模型"""
     status: str = "success"
     data: List[MetricDefinitionData]
+
+
+# ========== 管理员指标管理 Schema ==========
+
+class MetricAdminCreate(BaseModel):
+    """管理员创建系统指标定义请求模型"""
+    metric_key: str = Field(..., min_length=1, max_length=100, description="传给大模型的标准 JSON Key")
+    metric_label: str = Field(..., min_length=1, max_length=100, description="前端界面显示的中文名")
+    expected_type: ExpectedTypeEnum = Field(default=ExpectedTypeEnum.NUMERIC, description="期望类型")
+    prompt_instruction: Optional[str] = Field(None, max_length=500, description="AI 提取该指标时的专属微型提示词")
+    is_active: bool = Field(default=True, description="是否默认启用该指标模版")
+
+
+class MetricAdminUpdate(BaseModel):
+    """管理员更新系统指标定义请求模型（所有字段可选）"""
+    metric_label: Optional[str] = Field(None, min_length=1, max_length=100, description="前端界面显示的中文名")
+    expected_type: Optional[ExpectedTypeEnum] = Field(None, description="期望类型")
+    prompt_instruction: Optional[str] = Field(None, max_length=500, description="AI 提取该指标时的专属微型提示词")
+    is_active: Optional[bool] = Field(None, description="是否启用该指标模版")
 
 
 # ========== 提取结果相关 Schema ==========
@@ -84,8 +104,10 @@ class ReportCompareItem(BaseModel):
     """对比矩阵中单条报告的行数据 — 指标值以动态字典存储"""
     report_id: int
     filename: str
+    entity_name: Optional[str] = None
     metrics: Dict[str, Any]          # key=metric_key, value=数值或文本或None
-    anomalies: Dict[str, str] = {}   # key=metric_key, value="high"|"low"
+    anomalies: Dict[str, str] = {}   # key=metric_key, value="high"|"low"（保留向后兼容）
+    anomaly_details: Dict[str, Dict[str, Any]] = {}  # key=metric_key, value={direction, deviation, method}
 
 
 class MetricMatrixResponse(BaseModel):
@@ -119,6 +141,9 @@ class MultiSeriesDataPoint(BaseModel):
     unit: Optional[str] = None
     is_anomaly: Optional[bool] = False      # 是否为异常数据点
     anomaly_deviation: Optional[float] = None  # 异常偏离度
+    anomaly_direction: Optional[str] = None    # 异常方向："high"（偏高）| "low"（偏低）
+    anomaly_method: Optional[str] = None       # 检测方法："median_deviation" | "iqr" | "zscore"
+    anomaly_threshold: Optional[float] = None  # 检测阈值（方法不同含义不同）
 
 
 class SeriesData(BaseModel):

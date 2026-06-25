@@ -9,6 +9,23 @@ from fastapi import UploadFile, HTTPException, status
 from app.config import settings, ensure_upload_dir
 
 
+def resolve_stored_path(stored_path: str) -> Path:
+    """
+    将数据库中存储的路径解析为绝对路径。
+
+    兼容两种格式：
+    - 新格式（相对路径）："{user_id}/{md5}.pdf" → 相对于 UPLOAD_DIR 解析
+    - 旧格式（绝对路径）："E:\\CC_T\\backend\\uploads\\..." → 原样返回
+
+    这样无论项目部署到哪个目录，只要 UPLOAD_DIR 正确，文件都能找到。
+    """
+    path = Path(stored_path)
+    if path.is_absolute():
+        # 兼容历史绝对路径记录
+        return path
+    return Path(settings.UPLOAD_DIR).resolve() / stored_path
+
+
 def calculate_md5(file_content: bytes) -> str:
     """Calculate MD5 hash of file content."""
     return hashlib.md5(file_content).hexdigest()
@@ -43,8 +60,10 @@ def save_upload_file(file_content: bytes, filename: str, user_id: int) -> Tuple[
     # Save file
     with open(stored_path, "wb") as f:
         f.write(file_content)
-    
-    return str(stored_path.resolve()), md5_hash
+
+    # 存储相对路径（相对于 UPLOAD_DIR），避免部署路径变化导致文件"丢失"
+    relative_path = f"{user_id}/{stored_filename}"
+    return relative_path, md5_hash
 
 
 def validate_file(file: UploadFile) -> None:
@@ -94,12 +113,12 @@ def delete_upload_file(stored_path: str) -> bool:
     从磁盘删除已上传的文件。
 
     Args:
-        stored_path: 文件存储路径
+        stored_path: 文件存储路径（相对或绝对）
 
     Returns:
         True 表示删除成功，False 表示文件不存在
     """
-    path = Path(stored_path)
+    path = resolve_stored_path(stored_path)
     if path.exists():
         os.remove(path)
         return True

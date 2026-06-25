@@ -38,6 +38,11 @@
   color: #C41D15;
 }
 
+.anomaly-low {
+  background: #FFF7EB;
+  color: #AD6800;
+}
+
 .anomaly-icon {
   font-size: var(--font-size-base);
   margin-left: 4px;

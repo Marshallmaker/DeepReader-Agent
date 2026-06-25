@@ -7,7 +7,8 @@
  */
 
 import * as ChartRegistry from './ChartRegistry'
-import type { ChartTypeConfig, SeriesData, ReductionConfig } from './ChartRegistry'
+import type { ChartTypeConfig, SeriesData, ReductionConfig, DataPoint } from './ChartRegistry'
+import { ANOMALY_COLORS, formatAnomalyTooltip } from './ChartRegistry'
 import type { EChartsOption } from 'echarts'
 
 const config: ChartTypeConfig = {
@@ -23,29 +24,45 @@ const config: ChartTypeConfig = {
       ...new Set(
         data
           .flatMap((s) =>
-            s.data.map((d) => d.report_name || d.entity_name || '')
+            s.data.map((d) => d.entity_name || d.report_name || '')
           )
           .filter(Boolean)
       ),
     ]
     const displayReports = reportNames.slice(0, topN)
 
-    // 构建热力图数据：[metricIdx, reportIdx, value]
-    const heatData: [number, number, number][] = []
+    // 构建热力图数据：异常单元格使用对象格式以支持 itemStyle
+    const heatData: Array<{
+      value: [number, number, number]
+      itemStyle?: Record<string, unknown>
+      _dp?: DataPoint
+    }> = []
     for (let mi = 0; mi < metrics.length; mi++) {
       for (let ri = 0; ri < displayReports.length; ri++) {
         const point = metrics[mi].data.find(
           (d) =>
-            (d.report_name || d.entity_name) === displayReports[ri]
+            (d.entity_name || d.report_name) === displayReports[ri]
         )
         if (point && point.value != null) {
-          heatData.push([mi, ri, point.value])
+          const entry: any = { value: [mi, ri, point.value] as [number, number, number] }
+          if (point.is_anomaly) {
+            const anomalyColor =
+              ANOMALY_COLORS[point.anomaly_direction || ''] || '#FF3B30'
+            entry.itemStyle = {
+              borderColor: anomalyColor,
+              borderWidth: 3,
+            }
+            entry._dp = point
+          }
+          heatData.push(entry)
         }
       }
     }
 
+    // 提取纯数值用于 visualMap 最大值计算
+    const rawValues = heatData.map((d) => d.value[2])
     const dataMax =
-      heatData.length > 0 ? Math.max(...heatData.map((d) => d[2]), 1) : 100
+      rawValues.length > 0 ? Math.max(...rawValues, 1) : 100
 
     const totalItems = displayReports.length
     const visibleEnd =
@@ -54,8 +71,19 @@ const config: ChartTypeConfig = {
     const option: EChartsOption = {
       tooltip: {
         position: 'top' as const,
+        formatter: (params: any) => {
+          const dp: DataPoint | undefined = params.data?._dp
+          const val = params.data?.value?.[2] ?? params.value?.[2] ?? params.value
+          const mi = params.data?.value?.[0] ?? params.value?.[0]
+          const ri = params.data?.value?.[1] ?? params.value?.[1]
+          const metricName = metrics[mi]?.metric_label || `指标${mi}`
+          const reportName = displayReports[ri] || `报告${ri}`
+          let html = `${reportName}<br/>${metricName}: ${val != null ? val : '-'}`
+          if (dp) html += formatAnomalyTooltip(dp)
+          return html
+        },
       },
-      grid: { left: '18%', right: '10%', bottom: '18%', top: '5%' },
+      grid: { left: '24%', right: '10%', bottom: '20%', top: '5%' },
       xAxis: {
         type: 'category' as const,
         data: metrics.map((s) => s.metric_label),
@@ -69,9 +97,13 @@ const config: ChartTypeConfig = {
       yAxis: {
         type: 'category' as const,
         data: displayReports.map((n) =>
-          n.length > 18 ? n.slice(0, 18) + '...' : n
+          n.length > 15 ? n.slice(0, 15) + '...' : n
         ),
-        axisLabel: { fontSize: 11 },
+        axisLabel: {
+          fontSize: 11,
+          overflow: 'truncate',
+          width: 140,
+        },
         splitArea: { show: true },
       },
       visualMap: {

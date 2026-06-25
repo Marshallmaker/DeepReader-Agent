@@ -7,7 +7,8 @@
  */
 
 import * as ChartRegistry from './ChartRegistry'
-import type { ChartTypeConfig, SeriesData, ReductionConfig } from './ChartRegistry'
+import type { ChartTypeConfig, SeriesData, ReductionConfig, DataPoint } from './ChartRegistry'
+import { ANOMALY_COLORS, formatAnomalyTooltip } from './ChartRegistry'
 import type { EChartsOption } from 'echarts'
 
 const SECTOR_COLORS = [
@@ -22,8 +23,17 @@ const config: ChartTypeConfig = {
   buildOption: (data: SeriesData[], reduction?: ReductionConfig): EChartsOption => {
     const topN = reduction?.topN ?? 8
     const firstSeries = data[0]
-    if (!firstSeries) {
-      return { series: [{ type: 'pie', data: [] }] }
+    if (!firstSeries || firstSeries.data.length === 0) {
+      // 返回空环形图 + 居中提示文字，比纯白圆环更友好
+      return {
+        series: [{ type: 'pie', data: [], radius: ['40%', '65%'] }],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'center',
+          style: { text: '暂无数据', fontSize: 16, fill: '#999' },
+        } as any,
+      }
     }
 
     // 按 value 降序排列（过滤 null）
@@ -42,13 +52,20 @@ const config: ChartTypeConfig = {
       value: number
       name: string
       itemStyle: Record<string, unknown>
-    }> = topItems.map((d, idx) => ({
-      value: d.value as number,
-      name: d.report_name || d.entity_name || `项目${idx + 1}`,
-      itemStyle: d.is_anomaly
-        ? { borderColor: '#FF3B30', borderWidth: 3 }
-        : { borderColor: '#fff', borderWidth: 2 },
-    }))
+      _dp?: DataPoint
+    }> = topItems.map((d, idx) => {
+      const anomalyColor = d.is_anomaly
+        ? (ANOMALY_COLORS[d.anomaly_direction || ''] || '#FF3B30')
+        : '#fff'
+      return {
+        value: d.value as number,
+        name: d.report_name || d.entity_name || `项目${idx + 1}`,
+        itemStyle: d.is_anomaly
+          ? { borderColor: anomalyColor, borderWidth: 3 }
+          : { borderColor: '#fff', borderWidth: 2 },
+        _dp: d.is_anomaly ? d : undefined,
+      }
+    })
 
     if (otherItems.length > 0) {
       pieData.push({
@@ -59,7 +76,15 @@ const config: ChartTypeConfig = {
     }
 
     const option: EChartsOption = {
-      tooltip: { trigger: 'item' as const },
+      tooltip: {
+        trigger: 'item' as const,
+        formatter: (params: any) => {
+          const dp: DataPoint | undefined = params.data?._dp
+          let html = `${params.marker} ${params.name}: ${params.value} (${params.percent}%)`
+          if (dp) html += formatAnomalyTooltip(dp)
+          return html
+        },
+      },
       legend: { top: 0 },
       color: SECTOR_COLORS,
       series: [

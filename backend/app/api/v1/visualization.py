@@ -38,9 +38,10 @@ def _get_metric_signature(db: Session, batch_id: int) -> Set[str]:
         ).all()
         return {d.metric_key for d in defs}
 
-    # 旧批次回退：系统预置指标
+    # 旧批次回退：系统预置指标（仅启用的）
     defs = db.query(MetricDefinition).filter(
-        MetricDefinition.is_system == True
+        MetricDefinition.is_system == True,
+        MetricDefinition.is_active == True
     ).all()
     return {d.metric_key for d in defs}
 
@@ -95,9 +96,10 @@ def _resolve_metric_definitions(db: Session, batch_id: int) -> List[MetricDefini
             MetricDefinition.id.in_(ids)
         ).order_by(MetricDefinition.is_system.desc(), MetricDefinition.id.asc()).all()
 
-    # 旧批次回退
+    # 旧批次回退（仅启用的系统指标）
     return db.query(MetricDefinition).filter(
-        MetricDefinition.is_system == True
+        MetricDefinition.is_system == True,
+        MetricDefinition.is_active == True
     ).order_by(MetricDefinition.id.asc()).all()
 
 
@@ -160,6 +162,7 @@ async def get_trend_data(
                 data_points.append(MultiSeriesDataPoint(
                     report_id=report.id,
                     fiscal_year=fiscal_year,
+                    report_name=report.original_filename,
                     entity_name=report.entity_name,
                     batch_id=report.batch_id,
                     value=float(m.metric_value_num),
@@ -198,6 +201,9 @@ async def get_trend_data(
             if ar is not None and ar.is_anomaly:
                 dp.is_anomaly = True
                 dp.anomaly_deviation = ar.deviation
+                dp.anomaly_direction = ar.direction
+                dp.anomaly_method = ar.method
+                dp.anomaly_threshold = ar.threshold
 
     return MultiSeriesTrendResponse(
         batch_ids=batch_ids,
@@ -302,6 +308,9 @@ async def get_comparison_data(
             if ar is not None and ar.is_anomaly:
                 dp.is_anomaly = True
                 dp.anomaly_deviation = ar.deviation
+                dp.anomaly_direction = ar.direction
+                dp.anomaly_method = ar.method
+                dp.anomaly_threshold = ar.threshold
 
     return MultiSeriesComparisonResponse(
         batch_ids=batch_ids,

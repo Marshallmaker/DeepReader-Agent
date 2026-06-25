@@ -73,6 +73,7 @@
 .add-metric-btn:hover {
   opacity: 0.9;
   color: white !important;
+  background: var(--color-primary) !important;
 }
 
 .metric-list {
@@ -114,7 +115,7 @@
 }
 
 .delete-metric-btn {
-  opacity: 0.5;
+  opacity: 0.75;
   transition: opacity var(--transition-fast);
 }
 

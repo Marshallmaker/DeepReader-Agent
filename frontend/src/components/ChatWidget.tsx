@@ -5,10 +5,8 @@ import {
   UserOutlined, DeleteOutlined, FileTextOutlined,
 } from '@ant-design/icons'
 import { useChatStore } from '../stores/chatStore'
-import { useAuthStore } from '../stores/authStore'
+import { useChatStream } from '../hooks/useChatStream'
 import './ChatWidget.css'
-
-const SSE_READ_TIMEOUT_MS = 120_000
 
 /** 快捷提问建议 */
 const QUICK_PROMPTS = [
@@ -19,126 +17,22 @@ const QUICK_PROMPTS = [
 
 function ChatWidget() {
   const {
-    isOpen, sessionId, reportId, messages, toggleChat,
-    addMessage, clearMessages, setReportId, currentReportName,
+    isOpen, reportId, messages, toggleChat,
+    clearMessages, setReportId, currentReportName,
   } = useChatStore()
-  const { accessToken, clearAuth } = useAuthStore()
+  const { sendMessage, isLoading, currentAssistantMessage } = useChatStream()
   const [inputValue, setInputValue] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [currentAssistantMessage, setCurrentAssistantMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, currentAssistantMessage])
 
-  const sendMessage = async (content?: string) => {
+  const handleSend = (content?: string) => {
     const text = (content || inputValue).trim()
-    if (!text || isLoading) return
-
+    if (!text) return
     setInputValue('')
-    setCurrentAssistantMessage('')
-
-    addMessage({ role: 'user', content: text, timestamp: new Date() })
-    setIsLoading(true)
-
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-
-    try {
-      const response = await fetch('/api/v1/chat/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          report_id: reportId,
-          session_id: sessionId,
-          prompt: text,
-        }),
-        signal: controller.signal,
-      })
-
-      if (response.status === 401) {
-        try {
-          const refreshResp = await fetch('/api/v1/auth/refresh', {
-            method: 'POST', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-          })
-          if (refreshResp.ok) {
-            const { access_token } = await refreshResp.json()
-            if (access_token) {
-              useAuthStore.getState().updateToken(access_token)
-              message.info('Token 已刷新，请重新发送消息')
-            }
-          } else {
-            throw new Error('刷新失败')
-          }
-        } catch {
-          clearAuth()
-          window.location.href = '/login'
-          return
-        }
-        setIsLoading(false)
-        return
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: '请求失败' }))
-        throw new Error(errorData.message || errorData.detail || '请求失败')
-      }
-
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-
-      if (reader) {
-        let lastChunkTime = Date.now()
-        while (true) {
-          if (Date.now() - lastChunkTime > SSE_READ_TIMEOUT_MS) {
-            controller.abort()
-            throw new Error('AI 响应超时，请重试')
-          }
-          const { done, value } = await reader.read()
-          if (done) break
-          lastChunkTime = Date.now()
-          const chunk = decoder.decode(value, { stream: true })
-          const lines = chunk.split('\n')
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6)
-              if (data === '[DONE]') {
-                setCurrentAssistantMessage((prev) => {
-                  if (prev) {
-                    addMessage({ role: 'assistant', content: prev, timestamp: new Date() })
-                  }
-                  return ''
-                })
-                break
-              }
-              try {
-                const parsed = JSON.parse(data)
-                if (parsed.content) {
-                  setCurrentAssistantMessage((prev) => prev + parsed.content)
-                }
-              } catch { /* skip non-JSON */ }
-            }
-          }
-        }
-      }
-    } catch (error: unknown) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        /* timeout or abort */
-      } else if (error instanceof Error) {
-        message.error(error.message || '发送消息失败')
-      }
-      setCurrentAssistantMessage('')
-    } finally {
-      setIsLoading(false)
-      abortControllerRef.current = null
-    }
+    sendMessage(text)
   }
 
   const handleClearMessages = () => {
@@ -225,7 +119,7 @@ function ChatWidget() {
                 <div
                   key={i}
                   className="quick-prompt-item"
-                  onClick={() => sendMessage(prompt)}
+                  onClick={() => handleSend(prompt)}
                 >
                   {prompt}
                 </div>
@@ -268,7 +162,7 @@ function ChatWidget() {
           placeholder={reportId ? '针对报告提问...' : '输入消息...'}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onPressEnter={() => sendMessage()}
+          onPressEnter={() => handleSend()}
           disabled={isLoading}
           size="large"
           className="chat-input-field"
@@ -277,7 +171,7 @@ function ChatWidget() {
           type="primary"
           shape="circle"
           icon={<SendOutlined />}
-          onClick={() => sendMessage()}
+          onClick={() => handleSend()}
           loading={isLoading}
           className="chat-send-btn"
         />

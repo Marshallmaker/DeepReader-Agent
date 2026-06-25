@@ -9,6 +9,7 @@
 
 import * as ChartRegistry from './ChartRegistry'
 import type { ChartTypeConfig, SeriesData, ReductionConfig } from './ChartRegistry'
+import { ANOMALY_COLORS, formatAnomalyTooltip } from './ChartRegistry'
 import type { EChartsOption } from 'echarts'
 
 /** Gauge 颜色分档：[阈值, 颜色] */
@@ -51,18 +52,26 @@ const config: ChartTypeConfig = {
       const point = s.data[0]
       const value = point?.value ?? 0
       const isAnomaly = point?.is_anomaly ?? false
+      const anomalyColor = isAnomaly
+        ? (ANOMALY_COLORS[point?.anomaly_direction || ''] || '#FF3B30')
+        : 'auto'
 
-      // 网格布局定位
+      // 网格布局定位（增大纵向间距，避免多行重叠）
       const col = i % cols
       const rowIdx = Math.floor(i / cols)
       const xPct = ((col + 0.5) / cols) * 100
       const yPct =
-        rows <= 1 ? 58 : ((rowIdx + 0.7) / rows) * 90 + 5
+        rows <= 1 ? 55 : ((rowIdx + 0.55) / rows) * 82 + 8
       const center: [string, string] = [`${xPct}%`, `${yPct}%`]
 
-      // 根据仪表数量自适应半径
+      // 根据仪表数量和行数自适应半径
       const radius =
-        metricCount <= 2 ? '85%' : metricCount <= 4 ? '75%' : '65%'
+        metricCount <= 2 ? '82%' : metricCount <= 4 ? '72%' : '60%'
+
+      // 异常状态附加文本
+      const anomalyHint = isAnomaly
+        ? (point?.anomaly_direction === 'high' ? ' ⚠️偏高' : ' ⚠️偏低')
+        : ''
 
       return {
         type: 'gauge' as const,
@@ -79,34 +88,40 @@ const config: ChartTypeConfig = {
           },
         },
         pointer: {
-          itemStyle: {
-            color: isAnomaly ? '#FF3B30' : 'auto',
-          },
+          itemStyle: { color: anomalyColor },
         },
         axisTick: {
-          distance: -15,
+          distance: -16,
           length: 5,
           lineStyle: { width: 1, color: '#999' },
         },
         splitLine: {
-          distance: -20,
+          distance: -22,
           length: 10,
           lineStyle: { width: 2, color: '#999' },
         },
         axisLabel: {
-          distance: 25,
-          fontSize: 10,
+          distance: 32,
+          fontSize: 9,
           color: '#999',
         },
         detail: {
-          formatter: '{value}',
-          fontSize: 14,
-          offsetCenter: [0, '60%'],
+          formatter: (v: number) => `${v}${anomalyHint}`,
+          fontSize: 12,
+          offsetCenter: [0, '50%'],
         },
         title: {
-          offsetCenter: [0, '90%'],
-          fontSize: 11,
-          color: '#333',
+          offsetCenter: [0, '96%'],
+          fontSize: 10,
+          color: isAnomaly ? anomalyColor : '#333',
+        },
+        tooltip: {
+          formatter: () => {
+            if (!isAnomaly || !point) return `${s.metric_label}: ${value}`
+            let html = `${s.metric_label}: ${value}`
+            html += formatAnomalyTooltip(point)
+            return html
+          },
         },
         data: [{ value, name: s.metric_label }],
       }

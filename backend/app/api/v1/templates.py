@@ -43,6 +43,7 @@ def _template_to_response(tmpl: MetricTemplate) -> TemplateResponse:
                 metric_label=m.get("label", ""),
                 expected_type=m.get("type", "NUMERIC"),
                 prompt_instruction=m.get("prompt_instruction"),
+                disabled=m.get("disabled", False),
             ))
 
     return TemplateResponse(
@@ -51,6 +52,7 @@ def _template_to_response(tmpl: MetricTemplate) -> TemplateResponse:
         description=tmpl.description,
         category=tmpl.category,
         is_system=tmpl.is_system,
+        is_active=tmpl.is_active if hasattr(tmpl, 'is_active') else True,
         user_id=tmpl.user_id,
         metrics=metrics_list,
         metric_count=len(metrics_list),
@@ -87,7 +89,6 @@ async def list_templates(
             MetricTemplate.user_id == current_user.id,
         )
     )
-
     if category:
         query = query.filter(MetricTemplate.category == category)
 
@@ -323,6 +324,13 @@ async def import_template_metrics(
             detail="无权导入他人的模板",
         )
 
+    # 检查模版是否已被管理员禁用
+    if not getattr(template, 'is_active', True):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该模版已被管理员禁用，无法导入",
+        )
+
     if not template.metrics:
         return TemplateImportResponse(
             status="success",
@@ -340,14 +348,22 @@ async def import_template_metrics(
         expected_type_str = metric_item.get("type", "NUMERIC")
         prompt_instruction = metric_item.get("prompt_instruction")
 
+        # 跳过被管理员禁用的指标
+        if metric_item.get("disabled", False):
+            skipped_count += 1
+            continue
+
         if not metric_key:
             skipped_count += 1
             continue
 
-        # 检查该用户下是否已存在同名 metric_key
+        # 检查是否已存在同名 metric_key（用户自定义 + 系统预置）
         existing = db.query(MetricDefinition).filter(
-            MetricDefinition.user_id == current_user.id,
             MetricDefinition.metric_key == metric_key,
+            or_(
+                MetricDefinition.user_id == current_user.id,
+                MetricDefinition.is_system == True,
+            ),
         ).first()
 
         if existing:

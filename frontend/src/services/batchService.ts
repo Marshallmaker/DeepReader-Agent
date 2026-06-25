@@ -32,8 +32,10 @@ export interface MetricColumnDef {
 export interface ReportCompareItem {
   report_id: number
   filename: string
+  entity_name: string | null
   metrics: Record<string, any>
   anomalies: Record<string, string>
+  anomaly_details?: Record<string, { direction: string; deviation: number; method: string; threshold: number }>
 }
 
 export interface MetricMatrixResponse {

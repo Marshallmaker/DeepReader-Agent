@@ -29,6 +29,17 @@
   background: rgba(0, 0, 0, 0.02);
 }
 
+/* 选中行高亮 */
+.batch-row-selected,
+.batch-row-selected:hover {
+  background: #e6f4ff !important;
+  border-left: 3px solid #1677ff;
+}
+
+.batch-row-selected > td {
+  background: #e6f4ff !important;
+}
+
 .action-buttons {
   opacity: 0.7;
   transition: opacity var(--transition-normal);

@@ -84,7 +84,8 @@ async def get_batches(
         if batch.id not in metric_tags_map:
             # 旧批次回退
             sys_defs = db.query(MetricDefinition).filter(
-                MetricDefinition.is_system == True
+                MetricDefinition.is_system == True,
+                MetricDefinition.is_active == True
             ).all()
             metric_tags_map[batch.id] = [
                 MetricTagInfo(
@@ -129,7 +130,10 @@ def _get_batch_metric_signature(db: Session, batch_id: int) -> Set[str]:
         defs = db.query(MetricDefinition).filter(MetricDefinition.id.in_(ids)).all()
         return {d.metric_key for d in defs}
     # 旧批次回退
-    defs = db.query(MetricDefinition).filter(MetricDefinition.is_system == True).all()
+    defs = db.query(MetricDefinition).filter(
+        MetricDefinition.is_system == True,
+        MetricDefinition.is_active == True
+    ).all()
     return {d.metric_key for d in defs}
 
 
@@ -182,7 +186,10 @@ async def check_compatibility(
                 MetricDefinition.is_system.desc(), MetricDefinition.id.asc()
             ).all()
         else:
-            defs = db.query(MetricDefinition).filter(MetricDefinition.is_system == True).order_by(
+            defs = db.query(MetricDefinition).filter(
+                MetricDefinition.is_system == True,
+                MetricDefinition.is_active == True
+            ).order_by(
                 MetricDefinition.id.asc()
             ).all()
         common_metrics = [
@@ -248,6 +255,41 @@ async def update_batch_metrics(
     }
 
 
+@router.get("/{batch_id}/available-reports")
+def get_available_reports(
+    batch_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """返回批次中已完成处理的报告列表，供 AI 推荐选择报告"""
+    # 验证批次所属权
+    batch = db.query(UploadBatch).filter(
+        UploadBatch.id == batch_id,
+        UploadBatch.user_id == current_user.id,
+    ).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail="批次不存在")
+
+    reports = db.query(Report).filter(
+        Report.batch_id == batch_id,
+        Report.status == ReportStatus.SUCCESS,
+        Report.raw_markdown.isnot(None),
+        Report.raw_markdown != "",
+    ).order_by(Report.id).all()
+
+    return {
+        "status": "success",
+        "data": [
+            {
+                "id": r.id,
+                "original_filename": r.original_filename,
+                "status": r.status.value,
+            }
+            for r in reports
+        ],
+    }
+
+
 @router.get("/{batch_id}", response_model=BatchDetailResponse)
 async def get_batch_detail(
     batch_id: int,
@@ -280,9 +322,10 @@ async def get_batch_detail(
             MetricDefinition.id.in_(metric_def_ids)
         ).order_by(MetricDefinition.is_system.desc(), MetricDefinition.id.asc()).all()
     else:
-        # 旧批次回退系统指标
+        # 旧批次回退系统指标（仅启用的）
         metric_defs = db.query(MetricDefinition).filter(
-            MetricDefinition.is_system == True
+            MetricDefinition.is_system == True,
+            MetricDefinition.is_active == True
         ).order_by(MetricDefinition.id.asc()).all()
 
     metric_tags = [
@@ -352,9 +395,10 @@ async def get_batch_comparison(
             MetricDefinition.id.in_(metric_def_ids)
         ).order_by(MetricDefinition.is_system.desc(), MetricDefinition.id.asc()).all()
     else:
-        # 旧批次兼容：无 BatchMetricRelation 记录时回退系统预置指标
+        # 旧批次兼容：无 BatchMetricRelation 记录时回退系统预置指标（仅启用的）
         metric_defs = db.query(MetricDefinition).filter(
-            MetricDefinition.is_system == True
+            MetricDefinition.is_system == True,
+            MetricDefinition.is_active == True
         ).order_by(MetricDefinition.id.asc()).all()
 
     # 构建列定义列表
@@ -383,15 +427,26 @@ async def get_batch_comparison(
     # 异常检测（容错：检测失败不阻断对比接口）
     try:
         batch_anomalies = detect_batch_anomalies(db, batch_id, group_by="stock_code")
-        # 转换为 ReportCompareItem 需要的字符串格式
+        # 转换为 ReportCompareItem 需要的格式
         anomalies = {}
+        anomaly_details = {}
         for rid, metric_results in batch_anomalies.items():
             anomalies[rid] = {
                 mk: ar.direction for mk, ar in metric_results.items()
             }
+            anomaly_details[rid] = {
+                mk: {
+                    "direction": ar.direction,
+                    "deviation": ar.deviation,
+                    "method": ar.method,
+                    "threshold": ar.threshold,
+                }
+                for mk, ar in metric_results.items()
+            }
     except Exception as e:
         logger.warning(f"异常检测失败 (batch_id={batch_id}): {e}")
         anomalies = {}
+        anomaly_details = {}
 
     # 构建对比数据 — 按批次绑定的指标动态组装
     comparison_data = []
@@ -409,12 +464,15 @@ async def get_batch_comparison(
                 metrics[md.metric_key] = m.metric_value_raw if m else None
 
         report_anomalies = anomalies.get(report.id, {})
+        report_anomaly_details = anomaly_details.get(report.id, {})
 
         comparison_data.append(ReportCompareItem(
             report_id=report.id,
             filename=report.original_filename,
+            entity_name=report.entity_name,
             metrics=metrics,
             anomalies=report_anomalies,
+            anomaly_details=report_anomaly_details,
         ))
 
     return MetricMatrixResponse(
@@ -460,9 +518,13 @@ async def delete_batch(
     db.delete(batch)
     db.commit()
 
-    # 删除磁盘文件（数据库事务提交成功后才执行）
+    # 安全删除：每个文件只有当没有其他报告引用时才删除磁盘文件
     for path in file_paths:
-        delete_upload_file(path)
+        remaining = db.query(Report).filter(
+            Report.stored_path == path
+        ).count()
+        if remaining == 0:
+            delete_upload_file(path)
 
     return {"message": f"批次 #{batch_id} 已删除"}
 
@@ -502,9 +564,13 @@ async def delete_all_batches(
 
     db.commit()
 
-    # 删除磁盘文件
+    # 安全删除：每个文件只有当没有其他报告引用时才删除磁盘文件
     for path in file_paths_to_delete:
-        delete_upload_file(path)
+        remaining = db.query(Report).filter(
+            Report.stored_path == path
+        ).count()
+        if remaining == 0:
+            delete_upload_file(path)
 
     return {"message": f"已删除 {deleted_count} 个批次", "deleted_count": deleted_count}
 

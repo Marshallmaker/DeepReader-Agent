@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react'
-import { Modal, Button, Select, Switch, Typography, message } from 'antd'
-import { BarChartOutlined, LineChartOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo } from 'react'
+import { Modal, Button, Select, Switch, Typography, message, Alert } from 'antd'
+import { BarChartOutlined, LineChartOutlined, PieChartOutlined, DashboardOutlined, AimOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { BatchResponse, MetricTagInfo } from '../services/batchService'
 import { visualizationService, MultiSeriesTrendResponse, MultiSeriesComparisonResponse } from '../services/visualizationService'
 import * as ChartRegistry from './charts/ChartRegistry'
-import type { Report } from './charts/ChartRegistry'
+import type { ChartType, Report } from './charts/ChartRegistry'
 import ChartRenderer from './ChartRenderer'
+import { useDraggableModal } from '../hooks/useDraggableModal'
 import './charts'
+import { detectDimensions, evaluateConflict } from '../utils/dimensionDetector'
+import type { ConflictResult } from '../utils/dimensionDetector'
 
 const { Text } = Typography
 
 interface ChartModalProps {
   open: boolean
-  chartType: 'trend' | 'comparison'
+  chartType: ChartType | 'trend' | 'comparison'
   batches: BatchResponse[]
   selectedBatch: number | null
   onClose: () => void
@@ -26,9 +29,13 @@ function getMetricSignature(batch: BatchResponse): string {
     .join(',')
 }
 
+/** 包含时间信息的指标键名（用于自动模式判断是否请求趋势数据） */
+const TIME_RELATED_METRIC_KEYS = new Set(['fiscal_year', 'submission_date', 'repurchase_date'])
+
 function ChartModal({ open, chartType: initialType, batches, selectedBatch, onClose }: ChartModalProps) {
-  // ── 图表类型 ──────────────────────────────────────────
-  const [chartType, setChartType] = useState<'trend' | 'comparison'>(initialType)
+  const { modalRender } = useDraggableModal()
+  // ── 图表类型（支持新旧两种命名）──────────────────────
+  const [chartType, setChartType] = useState<string>(initialType)
   useEffect(() => { setChartType(initialType) }, [initialType])
 
   // ── 批次多选 ──────────────────────────────────────────
@@ -85,6 +92,18 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
   // ── 自动模式开关（默认开启） ──────────────────────────
   const [autoMode, setAutoMode] = useState(true)
 
+  // ── 量纲冲突检测（仅手动模式生效）──────────────────────
+  const dimensionConflict: ConflictResult | null = useMemo(() => {
+    if (autoMode || selectedMetricKeys.length < 2) return null
+    const selectedMetrics = availableMetrics.filter((m) => selectedMetricKeys.includes(m.metric_key))
+    if (selectedMetrics.length < 2) return null
+    const dimMap = detectDimensions(
+      selectedMetrics.map((m) => ({ metric_key: m.metric_key, metric_label: m.metric_label }))
+    )
+    const dimensions = selectedMetrics.map((m) => dimMap.get(m.metric_key) || 'unknown')
+    return evaluateConflict(dimensions)
+  }, [autoMode, selectedMetricKeys, availableMetrics])
+
   const handleGenerate = async () => {
     if (autoMode) {
       if (selectedBatchIds.length === 0) {
@@ -109,7 +128,25 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
 
       setLoading(true)
       try {
-        const result = await visualizationService.getComparisonData([batchId], metricKeys)
+        // 根据批次特征自动选择数据端点：
+        // - 包含时间类指标 + 报告数 ≥2 → 优先趋势端点（可展示时间序列）
+        // - 其他情况 → 对比端点
+        const hasTimeMetric = numericMetrics.some(
+          (m) => TIME_RELATED_METRIC_KEYS.has(m.metric_key)
+        )
+        const useTrendEndpoint = hasTimeMetric && firstBatch.total_files >= 2
+
+        const result = useTrendEndpoint
+          ? await visualizationService.getTrendData([batchId], metricKeys)
+          : await visualizationService.getComparisonData([batchId], metricKeys)
+
+        // 标注量纲维度
+        const dimMap = detectDimensions(
+          numericMetrics.map((m) => ({ metric_key: m.metric_key, metric_label: m.metric_label }))
+        )
+        result.series.forEach((s: any) => {
+          s.dimension = dimMap.get(s.metric_key) || 'unknown'
+        })
 
         // 从数据中提取报告信息用于 ChartRegistry.autoAssign
         const reportsMap = new Map<string, Report>()
@@ -139,12 +176,16 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
           return
         }
 
-        // 将 ChartRegistry 的新图表类型映射为旧类型（trend/comparison）
-        const typeMap: Record<string, 'trend' | 'comparison'> = {
+        // 将 ChartRegistry 的新图表类型映射为旧类型或直接使用新类型
+        const typeMap: Record<string, string> = {
           line: 'trend',
           bar: 'comparison',
+          pie: 'pie',
+          radar: 'radar',
+          gauge: 'gauge',
+          heatmap: 'heatmap',
         }
-        setChartType(typeMap[assignments[0].type] || 'comparison')
+        setChartType(typeMap[assignments[0].type] || (useTrendEndpoint ? 'trend' : 'comparison'))
         setChartData(result)
       } catch (error: any) {
         const msg = error?.response?.data?.detail || '自动生成图表失败'
@@ -181,11 +222,21 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
     setLoading(true)
     try {
       let result: MultiSeriesTrendResponse | MultiSeriesComparisonResponse
-      if (chartType === 'trend') {
+      if (chartType === 'trend' || chartType === 'line') {
         result = await visualizationService.getTrendData(selectedBatchIds, selectedMetricKeys)
       } else {
         result = await visualizationService.getComparisonData(selectedBatchIds, selectedMetricKeys)
       }
+      // 为每个 series 标注量纲维度（用于双轴分组和颜色绑定）
+      const dimMap = detectDimensions(
+        selectedMetricKeys.map((key) => {
+          const m = availableMetrics.find((a) => a.metric_key === key)
+          return { metric_key: key, metric_label: m?.metric_label || key }
+        })
+      )
+      result.series.forEach((s: any) => {
+        s.dimension = dimMap.get(s.metric_key) || 'unknown'
+      })
       setChartData(result)
     } catch (error: any) {
       const msg = error?.response?.data?.detail || '获取图表数据失败'
@@ -199,6 +250,8 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
   const handleClose = () => {
     setChartData(null)
     setSelectedBatchIds(selectedBatch ? [selectedBatch] : [])
+    setAutoMode(true)
+    setSelectedMetricKeys([])
     onClose()
   }
 
@@ -216,10 +269,21 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
 
   return (
     <Modal
+      modalRender={modalRender}
       title={
         <span className="modal-title">
-          {chartType === 'trend' ? <LineChartOutlined /> : <BarChartOutlined />}
-          {' '}{chartType === 'trend' ? '趋势分析' : '横向对比'}
+          {chartType === 'trend' || chartType === 'line' ? <LineChartOutlined /> :
+           chartType === 'pie' ? <PieChartOutlined /> :
+           chartType === 'radar' ? <AimOutlined /> :
+           chartType === 'gauge' ? <DashboardOutlined /> :
+           chartType === 'heatmap' ? <AppstoreOutlined /> :
+           <BarChartOutlined />}
+          {' '}{chartType === 'trend' || chartType === 'line' ? '趋势分析' :
+               chartType === 'pie' ? '饼图分析' :
+               chartType === 'radar' ? '雷达图分析' :
+               chartType === 'gauge' ? '仪表盘' :
+               chartType === 'heatmap' ? '热力图分析' :
+               '横向对比'}
         </span>
       }
       open={open}
@@ -263,6 +327,10 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
               options={[
                 { value: 'trend', label: '折线图（趋势）' },
                 { value: 'comparison', label: '柱状图（对比）' },
+                { value: 'pie', label: '饼图（环形图）' },
+                { value: 'radar', label: '雷达图' },
+                { value: 'gauge', label: '仪表盘' },
+                { value: 'heatmap', label: '热力图' },
               ]}
             />
           </div>
@@ -317,7 +385,7 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
                 { value: '__ALL__', label: `全选 (${availableMetrics.length}个)` },
                 ...availableMetrics.map((m) => ({
                   value: m.metric_key,
-                  label: `${m.metric_label} (${m.metric_key})`,
+                  label: m.metric_label,
                 })),
               ]}
               onSelect={(val) => {
@@ -335,8 +403,19 @@ function ChartModal({ open, chartType: initialType, batches, selectedBatch, onCl
         </div>
       )}
 
+      {/* 量纲冲突提示（非阻断） */}
+      {dimensionConflict && dimensionConflict.level !== 'none' && (
+        <Alert
+          type={dimensionConflict.level === 'high' ? 'warning' : 'info'}
+          message={dimensionConflict.level === 'high' ? '量纲差异较大' : '量纲提示'}
+          description={dimensionConflict.message}
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       {/* 图表区域 */}
-      {chartData && <ChartRenderer chartType={chartType} data={chartData} />}
+      {chartData && <ChartRenderer chartType={chartType as ChartType | 'trend' | 'comparison'} data={chartData} />}
       {!chartData && (
         <div style={{ textAlign: 'center', padding: 60, color: '#999', border: '1px dashed #d9d9d9', borderRadius: 8 }}>
           {autoMode ? '请选择批次，然后点击"生成图表"' : '请选择批次和指标，然后点击"生成图表"'}

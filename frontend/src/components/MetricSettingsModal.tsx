@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Modal, Button, Checkbox, Tag, message, Space } from 'antd'
+import { Modal, Button, Checkbox, Tag, message, Space, Tooltip } from 'antd'
 import { SettingOutlined, PlusOutlined, DeleteOutlined, EditOutlined, BulbOutlined } from '@ant-design/icons'
-import { MetricDefinition } from '../services/metricService'
+import { MetricDefinition, metricService } from '../services/metricService'
 import { extractErrorMessage } from '../utils/errorHandler'
+import { useDraggableModal } from '../hooks/useDraggableModal'
 import TemplateSelector from './TemplateSelector'
 import AIMetricRecommender from './AIMetricRecommender'
 
@@ -27,6 +28,7 @@ function MetricSettingsModal({
   onClose, onAddMetric, onDeleteMetric, onRefresh, onEditMetric,
   batchId,
 }: MetricSettingsModalProps) {
+  const { modalRender } = useDraggableModal()
   const [showAIRecommender, setShowAIRecommender] = useState(false)
 
   const handleSelectAll = (checked: boolean) => {
@@ -48,8 +50,47 @@ function MetricSettingsModal({
     }
   }
 
+  /** 仅勾选非系统预置的自定义指标 */
+  const handleSelectCustomOnly = () => {
+    const customIds = metrics.filter(m => !m.is_system).map(m => m.id)
+    onSelectionChange(customIds)
+  }
+
+  /** 批量删除选中的指标 */
+  const handleBatchDelete = () => {
+    if (selectedIds.length === 0) {
+      message.warning('请先勾选要删除的指标')
+      return
+    }
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedIds.length} 个指标吗？系统预置指标将被自动跳过，此操作不可撤销。`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const result = await metricService.deleteMetrics(selectedIds)
+          const parts: string[] = [`成功删除 ${result.deleted_count} 个指标`]
+          if (result.skipped_count > 0) {
+            parts.push(`跳过 ${result.skipped_count} 个（系统预置或无权操作）`)
+          }
+          message.success(parts.join('，'))
+          onSelectionChange([])
+          onRefresh()
+        } catch (error) {
+          message.error(extractErrorMessage(error, '批量删除失败'))
+        }
+      },
+    })
+  }
+
+  /** 当前选中的指标数量 */
+  const selectedCount = selectedIds.length
+
   return (
     <Modal
+      modalRender={modalRender}
       title={<span className="modal-title"><SettingOutlined /> 指标勾选矩阵</span>}
       open={open} onCancel={onClose} width={700} className="metric-modal"
       footer={[<Button key="close" onClick={onClose}>关闭</Button>]}
@@ -64,6 +105,18 @@ function MetricSettingsModal({
             全选 ({metrics.length}个)
           </Checkbox>
           <Space>
+            <Tooltip title="仅勾选非系统预置的指标">
+              <Button size="small" onClick={handleSelectCustomOnly}>仅选自定</Button>
+            </Tooltip>
+            <Button
+              size="small"
+              danger
+              disabled={selectedCount === 0}
+              icon={<DeleteOutlined />}
+              onClick={handleBatchDelete}
+            >
+              批量删除{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </Button>
             <TemplateSelector onImportComplete={onRefresh} />
             <Button icon={<PlusOutlined />} onClick={onAddMetric} className="add-metric-btn">添加指标</Button>
             <Button
@@ -107,6 +160,7 @@ function MetricSettingsModal({
         onClose={() => setShowAIRecommender(false)}
         onCreated={onRefresh}
         batchId={batchId}
+        existingMetricKeys={metrics.map(m => m.metric_key)}
       />
     </Modal>
   )

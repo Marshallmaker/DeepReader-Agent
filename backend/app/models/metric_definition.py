@@ -47,7 +47,10 @@ class MetricDefinition(Base):
     
     # 是否为系统预置指标（管理员 user_id=1 的指标为系统默认指标）
     is_system = Column(Boolean, default=False, nullable=False)
-    
+
+    # 系统指标是否启用（管理员可禁用某个系统指标模版，禁用后对所有用户不可见）
+    is_active = Column(Boolean, default=True, nullable=False)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

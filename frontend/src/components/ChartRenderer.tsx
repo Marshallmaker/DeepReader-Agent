@@ -11,8 +11,8 @@ import {
   LineChart,
   BarChart,
   PieChart,
-  GaugeChart,
   RadarChart,
+  GaugeChart,
   HeatmapChart,
 } from 'echarts/charts'
 import {
@@ -21,9 +21,9 @@ import {
   LegendComponent,
   TitleComponent,
   DataZoomComponent,
-  VisualMapComponent,
   GraphicComponent,
   RadarComponent,
+  VisualMapComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
@@ -40,27 +40,19 @@ echarts.use([
   LineChart,
   BarChart,
   PieChart,
-  GaugeChart,
   RadarChart,
+  GaugeChart,
   HeatmapChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
   TitleComponent,
   DataZoomComponent,
-  VisualMapComponent,
   GraphicComponent,
   RadarComponent,
+  VisualMapComponent,
   CanvasRenderer,
 ])
-
-// ── 公开常量 ──────────────────────────────────────────────
-
-/** 10 色调色板（Apple 系统色风格） */
-export const COLORS = [
-  '#007AFF', '#FF9500', '#34C759', '#FF3B30', '#AF52DE',
-  '#5856D6', '#00C7BE', '#FF2D55', '#8E8E93', '#007AFF',
-]
 
 // ── 向后兼容类型映射 ─────────────────────────────────────
 
@@ -146,95 +138,91 @@ function ChartRenderer({
     )
   }
 
+  // 检测数据中是否含有 fiscal_year（聚合功能依赖此字段）
+  const hasFiscalYear = normalizedData.some((s) =>
+    s.data.some((d) => !!d.fiscal_year)
+  )
+
   return (
     <>
-      {stats.hasReduction && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            flexWrap: 'wrap',
-            padding: '8px 0',
-            fontSize: 13,
-          }}
-        >
-          {/* Top-N 选择器 */}
+      {/* 控件栏始终显示，hasReduction 仅控制警告文本 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexWrap: 'wrap',
+          padding: '8px 0',
+          fontSize: 13,
+        }}
+      >
+        {/* Top-N 选择器 */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          Top-N:
+          <select
+            value={controls.topN}
+            onChange={(e) => controls.setTopN(Number(e.target.value))}
+            style={{ fontSize: 13 }}
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={0}>全部</option>
+          </select>
+        </label>
+
+        {/* 聚合粒度选择器 — 仅在数据含 fiscal_year 且非雷达图时显示 */}
+        {hasFiscalYear && mappedType !== 'radar' && (
           <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            Top-N:
+            聚合:
             <select
-              value={controls.topN}
-              onChange={(e) => controls.setTopN(Number(e.target.value))}
+              value={controls.granularity ?? ''}
+              onChange={(e) =>
+                controls.setGranularity(
+                  e.target.value
+                    ? (e.target.value as 'day' | 'month' | 'quarter')
+                    : null
+                  )
+                }
               style={{ fontSize: 13 }}
             >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={0}>全部</option>
+              <option value="">不聚合</option>
+              <option value="day">按日</option>
+              <option value="month">按月</option>
+              <option value="quarter">按季度</option>
             </select>
           </label>
+        )}
 
-          {/* 聚合粒度选择器 */}
-          {strategy.aggregateGranularity && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              聚合:
-              <select
-                value={controls.granularity ?? ''}
-                onChange={(e) =>
-                  controls.setGranularity(
-                    e.target.value
-                      ? (e.target.value as 'day' | 'month' | 'quarter')
-                      : null
-                    )
-                  }
-                style={{ fontSize: 13 }}
-              >
-                <option value="">不聚合</option>
-                <option value="day">按日</option>
-                <option value="month">按月</option>
-                <option value="quarter">按季度</option>
-              </select>
-            </label>
-          )}
-
-          {/* 异常优先复选框 */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <input
-              type="checkbox"
-              checked={controls.anomalyFirst}
-              onChange={(e) => controls.setAnomalyFirst(e.target.checked)}
-            />
-            异常优先
-          </label>
-
-          {/* 分页控件 */}
-          {controls.totalPages > 1 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button
-                disabled={controls.page <= 1}
-                onClick={() => controls.setPage(controls.page - 1)}
-                style={{ fontSize: 13, cursor: controls.page <= 1 ? 'not-allowed' : 'pointer' }}
-              >
-                上一页
-              </button>
-              <span>
-                {controls.page}/{controls.totalPages}
-              </span>
-              <button
-                disabled={controls.page >= controls.totalPages}
-                onClick={() => controls.setPage(controls.page + 1)}
-                style={{ fontSize: 13, cursor: controls.page >= controls.totalPages ? 'not-allowed' : 'pointer' }}
-              >
-                下一页
-              </button>
+        {/* 分页控件 */}
+        {controls.totalPages > 1 && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              disabled={controls.page <= 1}
+              onClick={() => controls.setPage(controls.page - 1)}
+              style={{ fontSize: 13, cursor: controls.page <= 1 ? 'not-allowed' : 'pointer' }}
+            >
+              上一页
+            </button>
+            <span>
+              {controls.page}/{controls.totalPages}
             </span>
-          )}
-
-          {/* 降载统计文本 */}
-          <span style={{ color: '#faad14' }}>
-            ⚠️ 已智能降载: 展示 {stats.shown}/{stats.total} 条，隐藏 {stats.hidden} 条普通数据
+            <button
+              disabled={controls.page >= controls.totalPages}
+              onClick={() => controls.setPage(controls.page + 1)}
+              style={{ fontSize: 13, cursor: controls.page >= controls.totalPages ? 'not-allowed' : 'pointer' }}
+            >
+              下一页
+            </button>
           </span>
-        </div>
-      )}
+        )}
+
+        {/* 降载统计文本 — 仅在有数据被裁剪时显示 */}
+        {stats.hasReduction && (
+          <span style={{ color: '#faad14', fontSize: 12 }}>
+            ⚠️ 已选 {stats.shown}/{stats.total} 条
+          </span>
+        )}
+      </div>
       <ReactEChartsCore
         echarts={echarts}
         option={option}

@@ -4,7 +4,15 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .layout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 包含 Sider 的内层 Layout：必须约束高度，否则 Sider 会随页面滚动 */
+.layout > .ant-layout-has-sider,
+.layout > .ant-layout {
+  flex: 1;
+  min-height: 0;
 }
 
 /* ── 顶栏（唯一使用磨砂玻璃的地方）────────────────────────── */
@@ -95,6 +103,8 @@
 .layout-sider .ant-layout-sider-children {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .layout-menu {

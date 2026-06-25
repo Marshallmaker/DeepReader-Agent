@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useChatStore } from './chatStore'
 
 interface User {
   id: number
@@ -28,19 +29,27 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isAdmin: false,
       
-      setAuth: (token, user) => set({
-        accessToken: token,
-        user: user,
-        isAuthenticated: true,
-        isAdmin: user.isAdmin
-      }),
-      
-      clearAuth: () => set({
-        accessToken: null,
-        user: null,
-        isAuthenticated: false,
-        isAdmin: false
-      }),
+      setAuth: (token, user) => {
+        // 新用户登录时重置聊天 Store，防止旧用户数据残留
+        useChatStore.getState().resetAll()
+        set({
+          accessToken: token,
+          user: user,
+          isAuthenticated: true,
+          isAdmin: user.isAdmin
+        })
+      },
+
+      clearAuth: () => {
+        // 退出登录时清除聊天数据
+        useChatStore.getState().resetAll()
+        set({
+          accessToken: null,
+          user: null,
+          isAuthenticated: false,
+          isAdmin: false
+        })
+      },
       
       updateToken: (token) => set({
         accessToken: token

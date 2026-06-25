@@ -26,6 +26,7 @@ class MetricTemplate(Base):
     description = Column(String(500), nullable=True)
     category = Column(String(50), nullable=True)
     is_system = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True, nullable=False, comment="模板是否启用（管理员可禁用）")
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     metrics = Column(JSON, nullable=False, comment="[{key,label,type,prompt_instruction}]")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

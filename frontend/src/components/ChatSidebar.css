@@ -1,0 +1,215 @@
+/* ═══════════════════════════════════════════════════════════════
+   DeepReader Agent — DeepSeek 风格聊天侧边栏
+   ═══════════════════════════════════════════════════════════════ */
+
+.chat-sidebar {
+  width: 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #F9FAFB;
+  border-right: 1px solid var(--color-divider);
+  transition: width 0.25s ease;
+  overflow: hidden;
+}
+
+.chat-sidebar.collapsed {
+  width: 0;
+  border-right: none;
+}
+
+/* ── 头部 ──────────────────────────────────────────────── */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  flex-shrink: 0;
+}
+
+.new-chat-btn {
+  height: 38px;
+  border-radius: 10px !important;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.collapse-btn {
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.collapse-btn:hover {
+  color: var(--color-primary);
+}
+
+/* ── 会话列表 ──────────────────────────────────────────── */
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 8px 12px;
+}
+
+/* 滚动条 */
+.session-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.session-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+/* ── 时间分组 ──────────────────────────────────────────── */
+.time-group {
+  margin-bottom: 4px;
+}
+
+.time-group-label {
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: none;
+  letter-spacing: 0;
+  user-select: none;
+}
+
+/* ── 会话项 ────────────────────────────────────────────── */
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  position: relative;
+  min-height: 42px;
+}
+
+.session-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.session-item.active {
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.session-item.active .session-item-title {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.session-item-icon {
+  font-size: 16px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.session-item.active .session-item-icon {
+  color: var(--color-primary);
+}
+
+.session-item-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.session-item-title {
+  font-size: 14px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  line-height: 1.4;
+}
+
+/* ── 重命名输入框 ──────────────────────────────────────── */
+.rename-input {
+  width: 100%;
+  border-radius: 6px !important;
+}
+
+.rename-input input {
+  font-size: 13px !important;
+  padding: 2px 6px !important;
+}
+
+/* ── Hover 操作按钮 ────────────────────────────────────── */
+.session-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.session-item:hover .session-item-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  min-width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+
+.action-btn:hover {
+  color: var(--color-text);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ── 空状态 ────────────────────────────────────────────── */
+.sidebar-empty,
+.sidebar-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  gap: 12px;
+}
+
+.sidebar-empty-icon {
+  font-size: 32px;
+  color: var(--color-text-tertiary);
+}
+
+.sidebar-empty-text,
+.sidebar-loading-text {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+/* ── 响应式 ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .chat-sidebar {
+    position: fixed;
+    left: 0;
+    top: var(--header-height);
+    bottom: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-modal);
+  }
+
+  .chat-sidebar.collapsed {
+    width: 0;
+    box-shadow: none;
+  }
+}

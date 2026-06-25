@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     SMTP_SENDER_NAME: str = "DeepReader"
     MAIL_SANDBOX_MODE: bool = True
 
+    # AI Text Truncation（智能首尾截断的最大字符数）
+    AI_RECOMMEND_TRUNCATE_CHARS: int = 12000   # AI 指标推荐
+    AI_EXTRACT_TRUNCATE_CHARS: int = 20000      # AI 指标提取
+    CHAT_CONTEXT_TRUNCATE_CHARS: int = 16000    # AI 聊天上下文
+
     # Debug Mode
     DEBUG: bool = True
 

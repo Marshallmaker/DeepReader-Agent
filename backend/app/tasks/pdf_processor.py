@@ -5,6 +5,8 @@ PDF processing and AI extraction tasks.
 """
 import json
 import re
+import time
+import random
 from typing import Optional, List, Dict
 from celery import shared_task
 from sqlalchemy.orm import Session
@@ -14,7 +16,9 @@ from app.models.report import Report, ReportStatus
 from app.models.metric import ExtractedMetric
 from app.models.metric_definition import MetricDefinition, BatchMetricRelation, ExpectedType
 from app.config import settings
-import httpx
+from app.utils.http_client import get_httpx_client
+from app.utils.text_utils import smart_truncate
+from app.utils.file import resolve_stored_path
 
 # 默认港股 8 项指标的 metric_key 集合（用于判断是否可使用调优版 Prompt）
 _DEFAULT_HK_METRIC_KEYS = {
@@ -74,9 +78,10 @@ def _load_batch_metrics(db: Session, batch_id: int) -> List[MetricDefinition]:
         ).all()
         return metrics
 
-    # 历史兼容：旧批次可能没有 batch_metric_relations 记录，回退到系统默认
+    # 历史兼容：旧批次可能没有 batch_metric_relations 记录，回退到系统默认（仅启用的）
     metrics = db.query(MetricDefinition).filter(
-        MetricDefinition.is_system == True
+        MetricDefinition.is_system == True,
+        MetricDefinition.is_active == True
     ).all()
     return metrics
 
@@ -165,9 +170,10 @@ def _numeric_clean(value) -> Optional[float]:
 @shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def process_batch(self, batch_id: int):
     """
-    处理批次中的所有报告（异步任务入口）。
+    处理批次中的所有报告（异步任务入口 — 分发模式）。
 
-    流程：读取批次绑定的指标定义 → 逐个处理报告 → 更新批次状态。
+    不再串行处理报告，改为逐条 dispatch process_single_report_task，
+    让 Celery worker 并发执行（受 worker_concurrency 限制）。
     """
     db = SessionLocal()
     try:
@@ -179,42 +185,19 @@ def process_batch(self, batch_id: int):
         batch.status = BatchStatus.PROCESSING
         db.commit()
 
-        # 加载批次绑定的指标定义（动态指标系统的核心入口）
-        metric_definitions = _load_batch_metrics(db, batch_id)
-
         # 获取批次中所有待处理报告
         reports = db.query(Report).filter(
             Report.batch_id == batch_id,
             Report.status == ReportStatus.PENDING
         ).all()
 
+        # 逐条分发独立任务，让 Celery worker 并发执行
+        dispatched = 0
         for report in reports:
-            try:
-                process_single_report(db, report, metric_definitions)
-                batch.processed_files += 1
-                db.commit()
-            except Exception as e:
-                db.rollback()  # 回滚失败的事务，恢复会话到可用状态
-                # 重新获取 report 对象（回滚后原对象已脱离会话）
-                report = db.query(Report).filter(Report.id == report.id).first()
-                if report:
-                    report.status = ReportStatus.FAILED
-                    report.error_message = str(e)[:500]
-                batch.processed_files += 1
-                db.commit()
+            process_single_report_task.delay(report.id)
+            dispatched += 1
 
-        # 更新批次最终状态
-        if batch.processed_files >= batch.total_files:
-            all_failed = db.query(Report).filter(
-                Report.batch_id == batch_id,
-                Report.status != ReportStatus.FAILED
-            ).count() == 0
-            batch.status = BatchStatus.FAILED if all_failed else BatchStatus.COMPLETED
-        else:
-            batch.status = BatchStatus.PARTIAL
-        db.commit()
-
-        return {"batch_id": batch_id, "status": batch.status.value}
+        return {"batch_id": batch_id, "dispatched": dispatched}
 
     except Exception as e:
         db.rollback()
@@ -236,7 +219,7 @@ def process_single_report(db: Session, report: Report, metric_definitions: List[
     report.status = ReportStatus.PARSING
     db.commit()
 
-    markdown_content = parse_pdf(report.stored_path)
+    markdown_content = parse_pdf(str(resolve_stored_path(report.stored_path)))
     if not markdown_content:
         raise Exception("PDF 解析失败：未能提取文本内容")
 
@@ -303,6 +286,10 @@ def extract_metrics_with_ai(markdown_content: str, metric_definitions: List[Metr
 
     根据 metric_definitions 动态组装 System Prompt 和 JSON Schema，
     港股默认指标集使用调优版 Prompt，自定义指标集使用通用 Prompt。
+
+    内置重试机制：对可恢复错误（429 限流、5xx 服务端错误、网络抖动）
+    自动重试最多 3 次，采用指数退避 + 随机抖动防止惊群效应。
+    不可恢复错误（400/401/403）不重试，立即返回 None。
     """
     # 选择 Prompt 策略
     if _is_default_hk_metrics(metric_definitions):
@@ -312,8 +299,12 @@ def extract_metrics_with_ai(markdown_content: str, metric_definitions: List[Metr
 
     json_schema = _build_json_schema_dict(metric_definitions)
 
-    try:
-        with httpx.Client(timeout=120.0) as client:
+    max_retries = 3
+    base_delay = 1.0  # 基础退避秒数
+
+    for attempt in range(max_retries + 1):
+        try:
+            client = get_httpx_client()
             response = client.post(
                 f"{settings.SILICONFLOW_API_BASE}/chat/completions",
                 headers={
@@ -324,7 +315,7 @@ def extract_metrics_with_ai(markdown_content: str, metric_definitions: List[Metr
                     "model": settings.SILICONFLOW_MODEL,
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"请提取以下文档中的指标：\n\n{markdown_content[:15000]}"}
+                        {"role": "user", "content": f"请提取以下文档中的指标：\n\n{smart_truncate(markdown_content, settings.AI_EXTRACT_TRUNCATE_CHARS)}"}
                     ],
                     "temperature": 0.1,
                     "max_tokens": 2000,
@@ -336,14 +327,56 @@ def extract_metrics_with_ai(markdown_content: str, metric_definitions: List[Metr
                 result = response.json()
                 content = result["choices"][0]["message"]["content"]
                 metrics = json.loads(content)
+                if attempt > 0:
+                    print(f"[extract_metrics] 第 {attempt} 次重试成功")
                 return metrics
+
+            # ── 判断错误是否可重试 ──────────────────────────
+            status_code = response.status_code
+
+            # 429 (Rate Limit) 和 5xx (服务端错误) 可重试
+            if status_code in (429, 502, 503, 504):
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    print(f"[extract_metrics] API {status_code} 限流/服务端错误，"
+                          f"第 {attempt + 1}/{max_retries} 次重试，等待 {delay:.1f}s")
+                    time.sleep(delay)
+                    continue
+                else:
+                    print(f"[extract_metrics] API {status_code} 错误，已达最大重试次数: "
+                          f"{response.text[:500]}")
+                    return None
+
+            # 4xx 客户端错误（除 429）不重试
+            print(f"[extract_metrics] API 客户端错误 {status_code}（不可重试）: "
+                  f"{response.text[:500]}")
+            return None
+
+        except (json.JSONDecodeError, KeyError) as e:
+            # JSON 解析失败：可能是响应被截断或格式错误，可重试
+            if attempt < max_retries:
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 0.5)
+                print(f"[extract_metrics] 响应解析失败 ({e})，"
+                      f"第 {attempt + 1}/{max_retries} 次重试，等待 {delay:.1f}s")
+                time.sleep(delay)
+                continue
             else:
-                print(f"[extract_metrics] API 错误: {response.status_code} - {response.text[:500]}")
+                print(f"[extract_metrics] 响应解析失败，已达最大重试次数: {e}")
                 return None
 
-    except Exception as e:
-        print(f"[extract_metrics] 请求异常: {e}")
-        return None
+        except Exception as e:
+            # 网络错误等可重试异常
+            if attempt < max_retries:
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                print(f"[extract_metrics] 请求异常 ({e})，"
+                      f"第 {attempt + 1}/{max_retries} 次重试，等待 {delay:.1f}s")
+                time.sleep(delay)
+                continue
+            else:
+                print(f"[extract_metrics] 请求异常，已达最大重试次数: {e}")
+                return None
+
+    return None
 
 
 def save_metrics(db: Session, report_id: int, metrics_data: dict, metric_definitions: List[MetricDefinition]):
@@ -411,10 +444,84 @@ def save_metrics(db: Session, report_id: int, metrics_data: dict, metric_definit
     db.commit()
 
 
+def _increment_batch_counter(db: Session, batch_id: int):
+    """
+    原子递增批次处理计数，并在全部完成时更新批次状态。
+
+    使用 SQL UPDATE 表达式实现无锁计数器递增，避免并行竞态。
+    """
+    db.query(UploadBatch).filter(
+        UploadBatch.id == batch_id
+    ).update({
+        UploadBatch.processed_files: UploadBatch.processed_files + 1
+    }, synchronize_session=False)
+    db.commit()
+
+    # 检查是否全部完成
+    batch = db.query(UploadBatch).filter(UploadBatch.id == batch_id).first()
+    if batch and batch.processed_files >= batch.total_files:
+        all_failed = db.query(Report).filter(
+            Report.batch_id == batch_id,
+            Report.status != ReportStatus.FAILED
+        ).count() == 0
+        batch.status = BatchStatus.FAILED if all_failed else BatchStatus.COMPLETED
+        db.commit()
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=10)
+def process_single_report_task(self, report_id: int):
+    """
+    处理单个报告（并行分发入口）。
+
+    由 process_batch 逐条 dispatch，多个 worker 并发执行。
+    成功或失败后均原子递增批次计数器。
+    """
+    db = SessionLocal()
+    try:
+        report = db.query(Report).filter(Report.id == report_id).first()
+        if not report:
+            return {"error": "Report not found"}
+
+        batch_id = report.batch_id
+        metric_definitions = _load_batch_metrics(db, batch_id)
+
+        try:
+            process_single_report(db, report, metric_definitions)
+        except Exception as e:
+            db.rollback()
+            # 重新获取 report 对象（回滚后原对象脱离会话）
+            report = db.query(Report).filter(Report.id == report_id).first()
+            if report:
+                report.status = ReportStatus.FAILED
+                report.error_message = str(e)[:500]
+            db.commit()
+
+        # 无论成功还是失败，原子递增批次计数器
+        _increment_batch_counter(db, batch_id)
+
+        return {"report_id": report_id, "status": report.status.value if report else "unknown"}
+
+    except Exception as e:
+        db.rollback()
+        # 外层异常也尝试更新计数器，防止计数器卡死
+        try:
+            report = db.query(Report).filter(Report.id == report_id).first()
+            if report:
+                _increment_batch_counter(db, report.batch_id)
+        except Exception:
+            pass
+        raise self.retry(exc=e)
+    finally:
+        db.close()
+
+
 @shared_task
 def process_report(report_id: int):
     """
-    处理单个报告（独立 Celery 任务入口，用于重试场景）。
+    处理单个报告（独立 Celery 任务入口，用于手动重试场景）。
+
+    与 process_single_report_task 功能相同，但不带自动重试和 batch counter 更新。
+    保留用于向后兼容。
     """
     db = SessionLocal()
     try:
@@ -424,10 +531,24 @@ def process_report(report_id: int):
 
         metric_definitions = _load_batch_metrics(db, report.batch_id)
         process_single_report(db, report, metric_definitions)
+
+        # 更新批次计数器
+        _increment_batch_counter(db, report.batch_id)
+
         return {"report_id": report_id, "status": "success"}
 
     except Exception as e:
         db.rollback()
+        # 失败也更新计数器
+        try:
+            report = db.query(Report).filter(Report.id == report_id).first()
+            if report:
+                report.status = ReportStatus.FAILED
+                report.error_message = str(e)[:500]
+                db.commit()
+                _increment_batch_counter(db, report.batch_id)
+        except Exception:
+            pass
         return {"report_id": report_id, "error": str(e)}
     finally:
         db.close()

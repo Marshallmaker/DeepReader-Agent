@@ -47,9 +47,10 @@ export const fileService = {
   /** 获取跨批次文件列表 */
   async getFiles(params?: {
     page?: number
-    pageSize?: number
-    batchId?: number
+    page_size?: number
+    batch_id?: number
     status?: string
+    filename?: string
   }): Promise<FileListResponse> {
     const response = await api.get('/files', { params })
     return response.data
@@ -97,5 +98,6 @@ export interface ReportContentResponse {
   file_size: number
   raw_markdown: string | null
   metrics_count: number
+  pdf_exists: boolean
   created_at: string
 }

@@ -5,9 +5,8 @@ import { UserOutlined, LockOutlined, SmileOutlined, MailOutlined } from '@ant-de
 import { authService } from '../services/authService'
 import { checkPasswordStrength, type StrengthInfo } from '../utils/password'
 import { extractErrorMessage } from '../utils/errorHandler'
-import VerificationCodeInput from '../components/VerificationCodeInput'
+import VerificationCodeInput, { cleanCode } from '../components/VerificationCodeInput'
 import '../styles/shared.css'
-import './Login.css'
 
 function Login() {
   const navigate = useNavigate()
@@ -82,13 +81,13 @@ function Login() {
 
   // ── 注册第二步：验证验证码 + 完成注册 ─────────────────
   const onRegisterFinish = async (values: { password: string; nickname?: string }) => {
-    if (!registerCode || registerCode.length !== 6) {
+    if (!registerCode || cleanCode(registerCode).length !== 6) {
       message.warning('请输入6位验证码')
       return
     }
     setRegisterLoading(true)
     try {
-      await authService.register(registerEmail, values.password, registerCode, values.nickname)
+      await authService.register(registerEmail, values.password, cleanCode(registerCode), values.nickname)
       message.success('注册成功，请登录')
       // 重置状态
       setRegisterStep(1)
@@ -185,7 +184,7 @@ function Login() {
 
                       <Form.Item name="remember_me" valuePropName="checked">
                         <div className="login-options">
-                          <Checkbox className="remember-checkbox">记住密码</Checkbox>
+                          <Checkbox className="remember-checkbox">保持登录状态</Checkbox>
                           <Button type="link" className="forgot-link" onClick={() => navigate('/forgot-password')}>
                             忘记密码？
                           </Button>

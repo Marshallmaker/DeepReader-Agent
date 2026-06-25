@@ -26,6 +26,10 @@ interface BatchTableProps {
   onDeleteBatch: (batchId: number) => void
   onRenameBatch: (batchId: number, name: string) => void
   onDeleteAllBatches: () => void
+  /** 当前选中的批次 ID，用于高亮行 */
+  selectedBatchId?: number | null
+  /** 点击行时回调，用于设置选中批次 */
+  onSelectBatch?: (batchId: number) => void
 }
 
 function renderStatus(status: string) {
@@ -50,9 +54,11 @@ function BatchTable({
   batches, loading, pagination,
   onPageChange, onRefresh, onViewComparison, onTrendAnalysis, onOpenChart,
   onDeleteBatch, onRenameBatch, onDeleteAllBatches,
+  selectedBatchId, onSelectBatch,
 }: BatchTableProps) {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
+  const [expandedMetrics, setExpandedMetrics] = useState<Set<number>>(new Set())
 
   const startRename = (batchId: number, currentName: string) => {
     setEditingId(batchId)
@@ -96,16 +102,21 @@ function BatchTable({
       className: 'table-header',
     },
     { title: '状态', dataIndex: 'status', key: 'status', width: 120, render: renderStatus, className: 'table-header' },
-    { title: '文件数', dataIndex: 'total_files', key: 'total_files', width: 80, className: 'table-header' },
-    { title: '已处理', dataIndex: 'processed_files', key: 'processed_files', width: 80, className: 'table-header' },
     {
-      title: '指标', key: 'metrics', width: 200, className: 'table-header',
+      title: '进度', key: 'progress', width: 120, className: 'table-header',
+      render: (_: any, record: BatchResponse) => (
+        <span style={{ color: '#666' }}>{record.processed_files}/{record.total_files}</span>
+      ),
+    },
+    {
+      title: '指标', key: 'metrics', width: 220, className: 'table-header',
       render: (_: any, record: BatchResponse) => {
         const tags = record.metric_tags || []
         if (tags.length === 0) return <span style={{ color: '#999' }}>—</span>
 
-        const visible = tags.slice(0, 2)
-        const hiddenCount = tags.length - visible.length
+        const isExpanded = expandedMetrics.has(record.batch_id)
+        const visible = isExpanded ? tags : tags.slice(0, 2)
+        const hiddenCount = tags.length - 2
 
         const tooltipContent = (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: 260 }}>
@@ -117,21 +128,46 @@ function BatchTable({
           </div>
         )
 
+        const toggleExpand = (e: React.MouseEvent) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setExpandedMetrics((prev) => {
+            const next = new Set(prev)
+            if (next.has(record.batch_id)) {
+              next.delete(record.batch_id)
+            } else {
+              next.add(record.batch_id)
+            }
+            return next
+          })
+        }
+
         return (
           <Tooltip
-            title={tooltipContent}
+            title={isExpanded ? null : tooltipContent}
             color="rgba(0, 0, 0, 0.5)"
-            overlayInnerStyle={{ padding: 8, backdropFilter: 'blur(4px)' }}
+            styles={{ body: { padding: 8, backdropFilter: 'blur(4px)' } }}
           >
-            <Space size={[2, 2]}>
+            <Space size={[2, 2]} wrap>
               {visible.map((tag) => (
                 <Tag key={tag.metric_key} color={tag.expected_type === 'NUMERIC' ? 'purple' : 'blue'} style={{ margin: 0 }}>
                   {tag.metric_label}
                 </Tag>
               ))}
-              {hiddenCount > 0 && (
-                <Tag style={{ margin: 0, background: '#f0f0f0', border: '1px dashed #d9d9d9' }}>
+              {hiddenCount > 0 && !isExpanded && (
+                <Tag
+                  style={{ margin: 0, background: '#f0f0f0', border: '1px dashed #d9d9d9', cursor: 'pointer' }}
+                  onClick={toggleExpand}
+                >
                   +{hiddenCount}
+                </Tag>
+              )}
+              {isExpanded && tags.length > 2 && (
+                <Tag
+                  style={{ margin: 0, background: '#f0f0f0', border: '1px dashed #d9d9d9', cursor: 'pointer' }}
+                  onClick={toggleExpand}
+                >
+                  收起
                 </Tag>
               )}
             </Space>
@@ -144,9 +180,9 @@ function BatchTable({
       render: (text: string) => new Date(text).toLocaleString('zh-CN'), className: 'table-header',
     },
     {
-      title: '操作', key: 'action', width: 240, className: 'table-header',
+      title: '操作', key: 'action', width: 260, className: 'table-header',
       render: (_: any, record: BatchResponse) => (
-        <Space className="action-buttons">
+        <Space className="action-buttons" size={4}>
           <Tooltip title="查看矩阵">
             <Button type="text" icon={<EyeOutlined />}
               onClick={() => onViewComparison(record.batch_id)}
@@ -204,7 +240,16 @@ function BatchTable({
       <Table
         columns={columns} dataSource={batches} rowKey="batch_id" loading={loading}
         pagination={{ ...pagination, onChange: onPageChange }}
-        className="batch-table" rowClassName={() => 'batch-row'}
+        className="batch-table"
+        rowClassName={(record) => {
+          const base = 'batch-row'
+          if (record.batch_id === selectedBatchId) return `${base} batch-row-selected`
+          return base
+        }}
+        onRow={(record) => ({
+          onClick: () => onSelectBatch?.(record.batch_id),
+          style: { cursor: 'pointer' },
+        })}
       />
     </div>
   )

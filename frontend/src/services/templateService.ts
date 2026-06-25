@@ -6,6 +6,7 @@ export interface MetricItem {
   metric_label: string
   expected_type: 'NUMERIC' | 'TEXT'
   prompt_instruction?: string
+  disabled?: boolean
 }
 
 /** 单个模板的完整响应 */
@@ -15,6 +16,7 @@ export interface TemplateResponse {
   description?: string
   category?: string
   is_system: boolean
+  is_active: boolean
   user_id?: number
   metrics: MetricItem[]
   metric_count: number
@@ -95,4 +97,83 @@ export const templateService = {
     const response = await api.post(`/metrics/templates/${id}/import`)
     return response.data
   },
+
+  // ========== 管理员合集模版管理 ==========
+
+  /**
+   * 获取所有合集模版（管理员专用，含已禁用的）
+   */
+  async getAdminTemplates(params?: {
+    page?: number; page_size?: number; category?: string; is_active?: boolean; is_system?: boolean
+  }): Promise<AdminTemplateListResponse> {
+    const response = await api.get('/admin/templates', { params })
+    return response.data
+  },
+
+  /**
+   * 创建合集模版（管理员专用）
+   */
+  async adminCreateTemplate(data: AdminCreateTemplateRequest): Promise<{ status: string; message: string; data: any }> {
+    const response = await api.post('/admin/templates', data)
+    return response.data
+  },
+
+  /**
+   * 更新合集模版（管理员专用，含 metrics 完整替换）
+   */
+  async adminUpdateTemplate(id: number, data: AdminUpdateTemplateRequest): Promise<{ status: string; message: string; data: any }> {
+    const response = await api.put(`/admin/templates/${id}`, data)
+    return response.data
+  },
+
+  /**
+   * 删除合集模版（管理员专用）
+   */
+  async adminDeleteTemplate(id: number): Promise<{ status: string; message: string }> {
+    const response = await api.delete(`/admin/templates/${id}`)
+    return response.data
+  },
+
+  /**
+   * 切换合集模版启用/禁用（管理员专用）
+   */
+  async adminToggleTemplateActive(id: number): Promise<{ status: string; message: string; is_active: boolean }> {
+    const response = await api.patch(`/admin/templates/${id}/active`)
+    return response.data
+  },
+
+  /**
+   * 一键启用/禁用所有系统合集模版（管理员专用）
+   */
+  async adminBulkToggleAllSystem(isActive: boolean): Promise<{ status: string; message: string; affected: number }> {
+    const response = await api.patch('/admin/templates/toggle-all', { is_active: isActive })
+    return response.data
+  }
+}
+
+/** 管理员模版列表响应 */
+export interface AdminTemplateListResponse {
+  total: number
+  page: number
+  page_size: number
+  items: TemplateResponse[]
+}
+
+/** 管理员创建合集模版请求 */
+export interface AdminCreateTemplateRequest {
+  name: string
+  description?: string
+  category?: string
+  is_system: boolean
+  is_active: boolean
+  metrics: MetricItem[]
+}
+
+/** 管理员更新合集模版请求 */
+export interface AdminUpdateTemplateRequest {
+  name?: string
+  description?: string
+  category?: string
+  is_active?: boolean
+  metrics?: MetricItem[]
 }

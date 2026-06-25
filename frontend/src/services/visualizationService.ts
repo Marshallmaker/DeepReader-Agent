@@ -6,9 +6,15 @@ export interface MultiSeriesDataPoint {
   fiscal_year: string
   entity_name?: string
   report_name?: string
+  report_id?: number
   batch_id?: number
   value: number | null
   unit?: string
+  is_anomaly?: boolean
+  anomaly_deviation?: number
+  anomaly_direction?: string
+  anomaly_method?: string
+  anomaly_threshold?: number
 }
 
 export interface SeriesData {

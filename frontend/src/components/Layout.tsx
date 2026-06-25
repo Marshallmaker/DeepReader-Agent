@@ -3,7 +3,8 @@ import { useEffect, useMemo } from 'react'
 import { Layout as AntLayout, Menu, Button, Dropdown, Avatar, Breadcrumb, message } from 'antd'
 import {
   DashboardOutlined,
-  HistoryOutlined,
+  BarChartOutlined,
+  FundOutlined,
   SettingOutlined,
   UserOutlined,
   LogoutOutlined,
@@ -23,8 +24,12 @@ const { Header, Content, Sider } = AntLayout
 /** 路由 → 面包屑名称映射 */
 const ROUTE_NAMES: Record<string, string> = {
   '/dashboard': '工作台',
-  '/admin': '管理员面板',
+  '/analytics': '数据分析中心',
+  '/metrics': '指标库',
+  '/chat': 'AI 对话',
   '/files': '全部文件',
+  '/profile': '个人中心',
+  '/admin': '管理员面板',
 }
 
 function Layout() {
@@ -47,7 +52,7 @@ function Layout() {
         }
       }
 
-      // 获取完整用户信息
+      // 兜底：获取完整用户信息（正常情况下 login() 已调用 /auth/me 完成）
       if (accessToken && user && user.id === 0) {
         try {
           const userInfo = await authService.getCurrentUser()
@@ -74,8 +79,12 @@ function Layout() {
 
   // 当前选中菜单
   const selectedKey = useMemo(() => {
-    if (location.pathname.startsWith('/admin')) return 'admin'
+    if (location.pathname.startsWith('/analytics')) return 'analytics'
+    if (location.pathname.startsWith('/metrics')) return 'metrics'
+    if (location.pathname.startsWith('/chat')) return 'chat'
     if (location.pathname.startsWith('/files')) return 'files'
+    if (location.pathname.startsWith('/profile')) return 'profile'
+    if (location.pathname.startsWith('/admin')) return 'admin'
     return 'dashboard'
   }, [location.pathname])
 
@@ -97,16 +106,34 @@ function Layout() {
       onClick: () => navigate('/dashboard'),
     },
     {
-      key: 'history',
-      icon: <HistoryOutlined />,
-      label: '历史批次',
-      onClick: () => navigate('/dashboard'),
+      key: 'analytics',
+      icon: <BarChartOutlined />,
+      label: '数据分析中心',
+      onClick: () => navigate('/analytics'),
+    },
+    {
+      key: 'metrics',
+      icon: <FundOutlined />,
+      label: '指标库',
+      onClick: () => navigate('/metrics'),
+    },
+    {
+      key: 'chat',
+      icon: <MessageOutlined />,
+      label: 'AI 对话',
+      onClick: () => navigate('/chat'),
     },
     {
       key: 'files',
       icon: <FileTextOutlined />,
       label: '全部文件',
       onClick: () => navigate('/files'),
+    },
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: '个人中心',
+      onClick: () => navigate('/profile'),
     },
   ]
 

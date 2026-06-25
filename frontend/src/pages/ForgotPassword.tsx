@@ -5,9 +5,8 @@ import { MailOutlined, KeyOutlined, CheckCircleOutlined, ArrowLeftOutlined } fro
 import { authService } from '../services/authService'
 import { checkPasswordStrength, type StrengthInfo } from '../utils/password'
 import { extractErrorMessage } from '../utils/errorHandler'
-import VerificationCodeInput from '../components/VerificationCodeInput'
+import VerificationCodeInput, { cleanCode } from '../components/VerificationCodeInput'
 import '../styles/shared.css'
-import './ForgotPassword.css'
 
 const { Step } = Steps
 
@@ -68,7 +67,7 @@ function ForgotPassword() {
   }
 
   const handleStep2Submit = async (values: { new_password: string; confirm_password: string }) => {
-    if (!verificationCode || verificationCode.length !== 6) {
+    if (!verificationCode || cleanCode(verificationCode).length !== 6) {
       message.warning('请输入6位验证码')
       return
     }
@@ -78,7 +77,7 @@ function ForgotPassword() {
     }
     setLoading(true)
     try {
-      const response = await authService.forgotPasswordResetWithCode(email, verificationCode, values.new_password)
+      const response = await authService.forgotPasswordResetWithCode(email, cleanCode(verificationCode), values.new_password)
       message.success(response.message)
       setCurrentStep(2)
     } catch (error) {

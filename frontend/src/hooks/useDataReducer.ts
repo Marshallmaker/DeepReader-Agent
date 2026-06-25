@@ -1,7 +1,7 @@
 /**
  * useDataReducer — 智能数据降载 Hook
  *
- * 为图表组件提供 Top-N 截断、时间聚合、异常优先排序、分页能力。
+ * 为图表组件提供 Top-N 截断、时间聚合、分页能力。
  *
  * @param rawData  原始 SeriesData 数组
  * @param strategy 降载策略（defaultTopN, pageSize, aggregateGranularity）
@@ -18,8 +18,6 @@ export interface ReductionControls {
   setTopN: (n: number) => void
   granularity: 'day' | 'month' | 'quarter' | null
   setGranularity: (g: 'day' | 'month' | 'quarter' | null) => void
-  anomalyFirst: boolean
-  setAnomalyFirst: (b: boolean) => void
   page: number
   setPage: (p: number) => void
   totalPages: number
@@ -43,21 +41,62 @@ function applyTopN(data: SeriesData[], n: number): SeriesData[] {
 
 function aggregateByGranularity(data: SeriesData[], granularity: 'day' | 'month' | 'quarter'): SeriesData[] {
   return data.map(s => {
-    const groups = new Map<string, { sum: number; count: number; hasAnomaly: boolean }>()
+    const groups = new Map<string, {
+      sum: number
+      count: number
+      hasAnomaly: boolean
+      // 保留聚合组中偏离度最大的异常数据点的详情
+      anomalyDirection?: string
+      anomalyDeviation?: number
+      anomalyMethod?: string
+      anomalyThreshold?: number
+      maxDeviation: number
+      unit?: string
+      // 保留实体元数据（取组内第一个非空值）
+      report_name?: string
+      entity_name?: string
+      report_id?: number
+    }>()
     s.data.forEach(d => {
-      const key = truncateDate(d.fiscal_year || '', granularity)
-      const g = groups.get(key) ?? { sum: 0, count: 0, hasAnomaly: false }
+      // 按 (时间段 + 报告) 分组，避免不同报告的同一时间段数据被错误合并
+      const entityKey = d.entity_name || d.report_name || ''
+      const dateKey = truncateDate(d.fiscal_year || '', granularity)
+      const key = entityKey ? `${dateKey}|${entityKey}` : dateKey
+      const g = groups.get(key) ?? { sum: 0, count: 0, hasAnomaly: false, maxDeviation: -1 }
       groups.set(key, g)
       g.sum += d.value ?? 0
       g.count += 1
-      if (d.is_anomaly) g.hasAnomaly = true
+      // 保留第一个非空 entity 元数据
+      if (!g.report_name && d.report_name) g.report_name = d.report_name
+      if (!g.entity_name && d.entity_name) g.entity_name = d.entity_name
+      if (!g.report_id && d.report_id) g.report_id = d.report_id
+      if (d.is_anomaly) {
+        g.hasAnomaly = true
+        const dev = d.anomaly_deviation ?? 0
+        if (dev > g.maxDeviation) {
+          g.maxDeviation = dev
+          g.anomalyDirection = d.anomaly_direction
+          g.anomalyDeviation = d.anomaly_deviation
+          g.anomalyMethod = d.anomaly_method
+          g.anomalyThreshold = d.anomaly_threshold
+        }
+      }
+      if (d.unit && !g.unit) g.unit = d.unit
     })
     return {
       ...s,
       data: Array.from(groups.entries()).map(([key, g]) => ({
-        fiscal_year: key,
+        fiscal_year: key.includes('|') ? key.split('|')[0] : key,
         value: g.sum / g.count,
+        report_name: g.report_name,
+        entity_name: g.entity_name,
+        report_id: g.report_id,
         is_anomaly: g.hasAnomaly || undefined,
+        anomaly_direction: g.anomalyDirection,
+        anomaly_deviation: g.anomalyDeviation,
+        anomaly_method: g.anomalyMethod,
+        anomaly_threshold: g.anomalyThreshold,
+        unit: g.unit,
       })),
     }
   })
@@ -74,13 +113,6 @@ function truncateDate(date: string, granularity: 'day' | 'month' | 'quarter'): s
   return `${date.slice(0, 4)}-Q${q}`
 }
 
-function anomalyFirst(data: SeriesData[]): SeriesData[] {
-  return data.map(s => ({
-    ...s,
-    data: [...s.data].sort((a, b) => (b.is_anomaly ? 1 : 0) - (a.is_anomaly ? 1 : 0)),
-  }))
-}
-
 // ── Hook ──────────────────────────────────────────────────
 
 export function useDataReducer(
@@ -91,13 +123,11 @@ export function useDataReducer(
   const [granularity, setGranularity] = useState<'day' | 'month' | 'quarter' | null>(
     (strategy.aggregateGranularity as 'day' | 'month' | 'quarter' | null) || null
   )
-  const [anomalyFirstEnabled, setAnomalyFirstEnabled] = useState(true)
   const [page, setPage] = useState(1)
   const pageSize = strategy.pageSize || 0
 
   const reducedData = useMemo(() => {
     let result = [...rawData]
-    if (anomalyFirstEnabled) result = anomalyFirst(result)
     if (granularity) result = aggregateByGranularity(result, granularity)
     if (topN > 0) result = applyTopN(result, topN)
     if (pageSize > 0) {
@@ -108,7 +138,7 @@ export function useDataReducer(
       }))
     }
     return result
-  }, [rawData, topN, granularity, anomalyFirstEnabled, page, pageSize])
+  }, [rawData, topN, granularity, page, pageSize])
 
   const totalItems = rawData.reduce((s, x) => s + x.data.length, 0)
   const shownItems = reducedData.reduce((s, x) => s + x.data.length, 0)
@@ -124,7 +154,6 @@ export function useDataReducer(
   const controls: ReductionControls = {
     topN, setTopN,
     granularity, setGranularity,
-    anomalyFirst: anomalyFirstEnabled, setAnomalyFirst: setAnomalyFirstEnabled,
     page, setPage,
     totalPages,
   }

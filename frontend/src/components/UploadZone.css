@@ -145,18 +145,37 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  line-height: 1.6;
 }
 
 .hint-label {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .hint-value {
   font-size: var(--font-size-sm);
   color: var(--color-primary);
   font-weight: 500;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.hint-toggle {
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+}
+
+.hint-toggle:hover {
+  color: var(--color-primary-hover);
 }
 
 @media (max-width: 768px) {

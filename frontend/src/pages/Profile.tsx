@@ -5,7 +5,7 @@ import { UserOutlined, MailOutlined, SmileOutlined, CameraOutlined, ArrowLeftOut
 import { useAuthStore } from '../stores/authStore'
 import { authService } from '../services/authService'
 import { extractErrorMessage } from '../utils/errorHandler'
-import VerificationCodeInput from '../components/VerificationCodeInput'
+import VerificationCodeInput, { cleanCode } from '../components/VerificationCodeInput'
 import '../styles/components.css'
 import './Profile.css'
 
@@ -144,13 +144,13 @@ function Profile() {
 
   // ── 邮箱修改：验证并更新 ──────────────────────────────
   const handleVerifyAndChange = async () => {
-    if (!verificationCode || verificationCode.length !== 6) {
+    if (!verificationCode || cleanCode(verificationCode).length !== 6) {
       message.warning('请输入6位验证码')
       return
     }
     setVerifyLoading(true)
     try {
-      const updated = await authService.changeEmailVerify(newEmail, verificationCode)
+      const updated = await authService.changeEmailVerify(newEmail, cleanCode(verificationCode))
       if (accessToken) {
         setAuth(accessToken, {
           id: updated.id,
